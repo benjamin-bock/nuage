@@ -1,0 +1,13 @@
+# binaires rclone embarqués (400 Mo) -> les récupérer via scripts/fetch_rclone.py
+vendor/
+# build PyInstaller
+dist/
+build/
+*.spec
+# python
+__pycache__/
+*.pyc
+# divers
+*.log
+.DS_Store
+Thumbs.db

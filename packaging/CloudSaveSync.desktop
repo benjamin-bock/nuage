@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Cloud Save Sync
+Comment=Sync bidirectionnel des sauvegardes de jeux vers le cloud
+Exec=/usr/bin/env python3 /opt/CloudSaveSync/savesync.py gui
+# Adapte Exec= au chemin réel de l'app packagée (ou lance l'AppImage) :
+# Exec=%h/bin/CloudSaveSync/CloudSaveSync
+Icon=cloud-save-sync
+Terminal=false
+Categories=Utility;Game;
+StartupWMClass=cloud-save-sync

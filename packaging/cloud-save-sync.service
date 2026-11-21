@@ -1,0 +1,21 @@
+# Service utilisateur systemd pour Cloud Save Sync (Linux).
+# Installation :
+#   mkdir -p ~/.config/systemd/user
+#   cp packaging/cloud-save-sync.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now cloud-save-sync.service
+# Le binaire packagé est attendu dans ~/bin/CloudSaveSync/CloudSaveSync,
+# sinon adapte ExecStart avec le chemin vers savesync.py + python3.
+
+[Unit]
+Description=Cloud Save Sync (sync des sauvegardes de jeux vers le cloud)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/bin/CloudSaveSync/CloudSaveSync --cli watch
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

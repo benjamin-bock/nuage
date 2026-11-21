@@ -1,0 +1,2 @@
+# Dépendances de build uniquement (l'app elle-même n'utilise que la stdlib Python + Tkinter)
+pyinstaller>=6.0
