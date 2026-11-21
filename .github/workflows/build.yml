@@ -1,0 +1,47 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows-amd64
+            add-data: "vendor/windows-amd64/rclone.exe;vendor/windows-amd64"
+            artifact: dist/CloudSaveSync.exe
+          - os: ubuntu-latest
+            target: linux-amd64
+            add-data: "vendor/linux-amd64/rclone:vendor/linux-amd64"
+            artifact: dist/CloudSaveSync
+          - os: macos-latest
+            target: macos-arm64
+            add-data: "vendor/macos-arm64/rclone:vendor/macos-arm64"
+            artifact: dist/CloudSaveSync
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: fetch rclone binaries
+        run: python scripts/fetch_rclone.py
+
+      - name: install pyinstaller
+        run: pip install pyinstaller
+
+      - name: build exe
+        run: pyinstaller --onefile --windowed --name CloudSaveSync --add-data "${{ matrix.add-data }}" savesync.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CloudSaveSync-${{ matrix.target }}
+          path: ${{ matrix.artifact }}
