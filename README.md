@@ -1,5 +1,17 @@
 # Cloud Save Sync v3 — app.exe + GUI multi-plateforme (Windows / Linux / macOS)
 
+## Repo GitHub
+
+Repo : `github.com/benjamin-bock/cloud-save-sync` (privé). Le code source est commité
+en local (`git log` dans ce dossier) ; `vendor/` (binaires rclone) et `dist/` (exe)
+sont exclus via `.gitignore` — les régénérer avec `python scripts/fetch_rclone.py --all`
+et le build PyInstaller (voir plus bas).
+
+Pour pousser après création du repo vide côté GitHub :
+```bash
+git push -u origin main
+```
+
 > **Windows, zéro terminal** : double-clique `dist\CloudSaveSync.exe` (ou le raccourci
 > `CloudSaveSync.lnk` sur ton Bureau). Pour la **première configuration** (connexion du
 > compte cloud), double-clique `setup.bat` : il ouvre un terminal, fait les commandes
