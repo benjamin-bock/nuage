@@ -1,0 +1,51 @@
+name: 🐛 Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect vs what happened?
+      placeholder: "Clicked Sync, got error X..."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run setup.bat
+        2. Click Scan
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS and version
+      placeholder: "Windows 11 23H2 / Ubuntu 24.04 / macOS 15"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      placeholder: "v3.0.0 (release) or git commit"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log output
+      description: Paste the GUI journal or CLI output
+      render: shell
+    validations:
+      required: false
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Cloud provider
+      options: [onedrive-local, onedrive (rclone), gdrive, dropbox, icloud, local:, other]
+    validations:
+      required: true

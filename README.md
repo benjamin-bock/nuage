@@ -10,6 +10,20 @@ so you can continue your progress on another device. Cross-platform desktop app 
 No account needed on our side: everything goes to *your own* cloud account. The sync engine is
 [`rclone bisync`](https://rclone.org/bisync/) (true two-way sync), bundled with the app.
 
+## 🚀 Quick start for gamers (3 steps, no terminal)
+
+1. **Download** the latest `CloudSaveSync-windows-amd64.exe` from [Releases](https://github.com/benjamin-bock/cloud-save-sync/releases)
+   (Linux/macOS: see [Install](#install)).
+2. **Double-click `setup.bat`** from the source folder (or the release zip): pick your cloud
+   (`1) onedrive-local` recommended — no login prompt at all), it scans your games and syncs once.
+3. In the app: click **▶ Auto-sync**. Play on any PC — your saves follow you.
+
+```mermaid
+flowchart LR
+    A["💻 PC #1<br/>game saves"] <-->|"rclone bisync<br/>(2-way sync)"| C["☁️ your cloud<br/>SaveSync/"]
+    B["💻 PC #2 / laptop<br/>game saves"] <-->|"rclone bisync"| C
+```
+
 ## Features
 
 - **True sync, not just backup** (rclone `bisync`): changes, renames **and deletions** propagate both ways (PC ↔ cloud).
@@ -160,6 +174,19 @@ pyinstaller --onefile --windowed --name CloudSaveSync savesync.py --add-data "ve
 The binary embeds rclone (extracted at launch). GitHub Actions builds all three automatically on every
 push/tag: see [.github/workflows/build.yml](.github/workflows/build.yml).
 
+## FAQ
+
+- **Does it work with Steam / Epic / GOG / Microsoft Store games?** Yes — Steam incl. Proton
+  (`compatdata`), Epic/GOG via `AppData`, Microsoft Store via `Packages`. Detection is automatic;
+  add manually if a game hides elsewhere.
+- **Will it delete my saves?** No. Deletions only propagate if *you* delete files locally.
+  On a conflict (same file changed on both PCs) the newest wins and the other version is kept
+  as `*.conflictN` — check with `conflicts` / the GUI.
+- **Is it safe / private?** Saves go only to *your* cloud account. See [SECURITY.md](SECURITY.md)
+  (incl. how to encrypt with an rclone `crypt` remote).
+- **Work/school OneDrive gives `AADSTS700016`?** Use `onedrive-local` — see [Troubleshooting](#troubleshooting).
+- **Offline?** With a `*-local` backend everything works offline and syncs when the cloud client reconnects.
+
 ## Troubleshooting
 
 - **`AADSTS700016` error during `rclone config` for OneDrive** (work/school account, e.g. university):
@@ -195,6 +222,11 @@ cloud-save-sync/
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and PRs welcome!
+Fork it, improve it (new game-folder heuristics, tray icon, translations…), and share your fork —
+that's the point of the MIT license. 💙
+
+When you create the repo, add these **topics** so gamers can find it:
+`game-saves`, `cloud-sync`, `rclone`, `bisync`, `steam`, `steam-deck`, `proton`, `self-hosted`, `gaming`, `backup`
 
 ## License
 
