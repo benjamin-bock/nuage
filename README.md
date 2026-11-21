@@ -1,133 +1,154 @@
-# Cloud Save Sync v3 — app.exe + GUI multi-plateforme (Windows / Linux / macOS)
+# Cloud Save Sync
 
-## Repo GitHub
+[![build](https://github.com/benjamin-bock/cloud-save-sync/actions/workflows/build.yml/badge.svg)](https://github.com/benjamin-bock/cloud-save-sync/actions/workflows/build.yml)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
-Repo : `github.com/benjamin-bock/cloud-save-sync` (privé). Le code source est commité
-en local (`git log` dans ce dossier) ; `vendor/` (binaires rclone) et `dist/` (exe)
-sont exclus via `.gitignore` — les régénérer avec `python scripts/fetch_rclone.py --all`
-et le build PyInstaller (voir plus bas).
+**Bidirectional sync of your PC game saves to the cloud** (OneDrive, Google Drive, Dropbox, iCloud…),
+so you can continue your progress on another device. Cross-platform desktop app for **Windows, Linux and macOS**.
 
-Pour pousser après création du repo vide côté GitHub :
+No account needed on our side: everything goes to *your own* cloud account. The sync engine is
+[`rclone bisync`](https://rclone.org/bisync/) (true two-way sync), bundled with the app.
+
+## Features
+
+- **True sync, not just backup** (rclone `bisync`): changes, renames **and deletions** propagate both ways (PC ↔ cloud).
+  Conflicts (file changed on both sides) → the newest wins, the loser is kept as `*.conflictN`. No data loss.
+- **Automatic save-folder detection** per OS (see [Where saves are looked for](#where-saves-are-looked-for)).
+- **Auto-sync**: syncs ~3 s after every file change (file watcher) + periodic safety sync.
+- **New PC detection**: if the local folder is empty and the cloud has saves, they are downloaded first — the cloud is never wiped by an empty folder.
+- **Cloud providers**: any rclone remote (OneDrive, Google Drive, Dropbox, Mega…), `icloud`,
+  or a **local cloud folder** (`onedrive-local`, `gdrive-local`, `dropbox-local`) — no OAuth at all,
+  perfect for work/school accounts (see [AADSTS700016 error](#aadsts700016-error-on-onedrive-oauth)).
+- **GUI** (Tkinter, zero extra deps) + full **CLI** for headless/server use.
+- Packaged as a single standalone `.exe` / binary per OS (see [Releases](https://github.com/benjamin-bock/cloud-save-sync/releases)).
+
+## Install
+
+### Windows (no terminal needed)
+
+1. Download the latest `CloudSaveSync-windows-amd64.exe` from [Releases](https://github.com/benjamin-bock/cloud-save-sync/releases)
+   (or build it yourself, see [Build](#build)).
+2. Double-click **`setup.bat`** in the source folder once: it connects your cloud (choice `1) onedrive-local`
+   recommended — no OAuth), auto-scans your save folders, runs the first sync, then opens the app.
+3. In the app: check the folders, click **🔄 Sync now**, then **▶ Auto-sync**.
+
+### From source (Windows / Linux / macOS)
+
+Requirements: Python 3.10+ with Tkinter.
+- Windows / macOS: official installer from [python.org](https://www.python.org/downloads/) (Tkinter included).
+- Linux: `sudo apt install python3 python3-tk` (or your distro's equivalent).
+
 ```bash
-git push -u origin main
+git clone https://github.com/benjamin-bock/cloud-save-sync.git
+cd cloud-save-sync
+python scripts/fetch_rclone.py      # download the rclone binary for your platform (vendor/)
+python savesync.py                  # launch the GUI
+# or CLI:
+python savesync.py --cli init       # pick your provider (e.g. onedrive-local)
+python savesync.py --cli scan --auto
+python savesync.py --cli sync
 ```
 
-> **Windows, zéro terminal** : double-clique `dist\CloudSaveSync.exe` (ou le raccourci
-> `CloudSaveSync.lnk` sur ton Bureau). Pour la **première configuration** (connexion du
-> compte cloud), double-clique `setup.bat` : il ouvre un terminal, fait les commandes
-> (rclone config → scan auto → premier sync) puis lance l'app.
-> Sur Linux/macOS : `sh setup.sh`.
+Linux/macOS one-liner setup: `sh setup.sh`.
 
-Application graphique qui **synchronise en bidirectionnel** les sauvegardes de tes jeux
-vers le cloud (OneDrive, Google Drive, Dropbox, Mega… via rclone, ou iCloud), pour
-continuer ta progression sur un autre appareil.
+> Windows: if `python` says "run without arguments to install" (Microsoft Store stub),
+> open a **new** terminal (the fixed PATH is at the top of the registry) or use `.\run.ps1`.
 
-- **Vrai sync** (moteur `rclone bisync`) : modifications, renommages **et suppressions**
-  propagés dans les deux sens. Conflit (modifié des 2 côtés) → le plus récent gagne,
-  l'autre est conservé en `*.conflictN` (aucune perte).
-- **Détection auto** des dossiers de saves, par OS (voir tableau ci-dessous).
-- **Auto-sync** : bouton ▶ dans l'app (sync ~3 s après chaque changement de fichier +
-  synchro périodique), ou tâche planifiée / service systemd.
-- **Nouveau PC** : détecté automatiquement (dossier vide + cloud plein) → les saves
-  du cloud sont téléchargées d'abord, le cloud n'est jamais écrasé.
-- Moteur backup legacy (`copy`, jamais de suppression) sélectionnable dans les paramètres.
-- 100 % local + ton propre compte cloud. Python stdlib uniquement (Tkinter), rclone embarqué.
+## Usage
 
-## Arborescence
+### GUI
 
-```
-cloud-save-sync/
-├── dist/CloudSaveSync.exe # ← L'APP WINDOWS (autonome, rclone embarqué) + raccourci Bureau
-├── setup.bat              # 1er run Windows : double-clic, fait tout et lance l'app
-├── setup.sh               # idem Linux/macOS
-├── run.ps1 / run.bat      # lance depuis les sources (GUI ou --cli ...)
-├── savesync.py            # point d'entrée (GUI par défaut, --cli pour la CLI)
-├── savesync/              # core.py (moteur), cli.py, gui.py (Tkinter)
-├── scripts/fetch_rclone.py
-├── vendor/                # binaires rclone embarqués (win/linux/mac × amd64/arm64)
-├── packaging/             # Install-Task.ps1, service systemd, .desktop
-└── README.md
-```
-
-## Lancer depuis les sources
-
-Prérequis : Python 3.10+ avec Tkinter.
-- Windows : installeur officiel python.org (Tkinter inclus).
-- Linux : `sudo apt install python3 python3-tk` (ou équivalent).
-- macOS : installeur python.org (Tkinter inclus).
-
-```powershell
-# Windows — le plus simple (trouve Python tout seul, même si le stub Microsoft Store bloque "python") :
-.\run.ps1                             # lance la GUI
-.\run.ps1 --cli init                  # configure le cloud (ex: onedrive)
-.\run.ps1 --cli scan --auto           # détecte + ajoute tous les dossiers de saves
-.\run.ps1 --cli sync                  # premier sync
-# ou directement : python savesync.py / python savesync.py --cli ...
-```
-```bash
-# Linux / macOS
-python3 scripts/fetch_rclone.py       # télécharge rclone pour ta plateforme (vendor/)
-python3 savesync.py                   # lance la GUI
-python3 savesync.py --cli scan --auto
-python3 savesync.py --cli sync
-```
-> Windows : si `python` dit « exécutez sans arguments pour installer » (stub Microsoft Store),
-> ouvre un **nouveau** terminal PowerShell (le PATH corrigé est en tête du registre) ou utilise `.\run.ps1`.
-
-Premier lancement : connecte ton cloud à rclone une fois pour toutes :
-```bash
-vendor/windows-amd64/rclone.exe config        # Windows
-vendor/linux-amd64/rclone config              # Linux
-vendor/macos-arm64/rclone config              # macOS (arm64)
-```
-puis choisis `n`, nomme le remote (`onedrive`, `gdrive`, `dropbox`…) et connecte-toi.
-Dans l'app, mets ce nom de remote dans ⚙ Paramètres.
-
-## Utilisation de la GUI
-
-| Bouton | Action |
+| Button | Action |
 |---|---|
-| 🔎 Scanner | détecte les dossiers de saves → coche ceux à surveiller |
-| ➕ Ajouter… | ajouter un dossier manuellement |
-| ➖ Retirer | retirer un dossier (le cloud est conservé) |
-| 🔄 Sync maintenant | sync bidirectionnel immédiat |
-| 👁 Statut | dry-run : ce qui changerait |
-| ▶ Auto-sync / ⏹ Stop | watch : sync auto à chaque changement de fichier |
-| ⚙ Paramètres | provider cloud, dossier racine, moteur, conflits, intervalles |
+| 🔎 Scan | detect save folders → tick the ones to watch |
+| ➕ Add… | add a folder manually |
+| ➖ Remove | stop watching a folder (cloud copy is kept) |
+| 🔄 Sync now | bidirectional sync immediately |
+| 👁 Status | dry-run: what would change |
+| 🧹 Clean | drop false positives / deleted paths from the watch list |
+| ▶ Auto-sync / ⏹ Stop | sync on every file change + periodic sync |
+| ⚙ Settings | cloud provider, root folder, engine, conflict policy, intervals |
 
-CLI équivalente : `python savesync.py --cli <commande>` (`list`, `status`, `conflicts`,
-`resync [cle]`, `watch`…).
+### CLI
 
-## Sur l'autre appareil
+```bash
+python savesync.py --cli init                 # interactive configuration
+python savesync.py --cli scan [--auto]        # detect (and optionally add) save folders
+python savesync.py --cli add "<path>"         # watch a folder manually
+python savesync.py --cli remove "<key>"       # stop watching
+python savesync.py --cli list                 # list watched folders
+python savesync.py --cli sync                 # sync now
+python savesync.py --cli status               # dry-run
+python savesync.py --cli conflicts            # list *.conflictN
+python savesync.py --cli resync ["<key>"]     # force an initial resync
+python savesync.py --cli clean                # remove false positives
+python savesync.py --cli watch                # continuous auto-sync
+```
 
-Même appli + même compte cloud, puis `scan --auto` (ou ➕ manuel) et `sync` :
-les saves du cloud arrivent automatiquement (détection "nouveau PC").
+### On the other device
 
-## Où sont cherchées les sauvegardes
+Same app + same cloud account, then `scan --auto` (or ➕ Add) and `sync`:
+saves arrive automatically (new-PC detection). On Windows you can also install the
+scheduled task (below) on both machines.
 
-| OS | Racines scannées |
+## Where saves are looked for
+
+| OS | Scanned roots |
 |---|---|
-| Windows | `%APPDATA%`, `%LOCALAPPDATA%`, **`%LOCALAPPDATA%\LocalLow`** (jeux Unity : `LocalLow\<Studio>\<Jeu>\user1.dat`, ex. Hollow Knight Silksong — extensions `.dat`/`.bin` acceptées), `Saved Games`, `Documents\Saved Games`, `Documents\My Games`, `Packages\<éditeur>\<jeu>` (jeux Microsoft Store) |
-
-Faux positifs exclus automatiquement (cache rclone, crashreports, launchers, éditeurs,
-"unsaved-meetings"…). Pour un jeu dans un dossier exotique, ajoute la racine dans
-`extra_roots` de la config (`%APPDATA%\savesync\config.json`) ou via ➕ Ajouter dans la GUI.
-| Linux | `~/.config`, `~/.local/share`, `~/.var/app` (Flatpak), Steam/Proton : `compatdata/<appid>/pfx/drive_c/users/<user>/{AppData\Roaming,AppData\Local,AppData\LocalLow,Documents,Saved Games}` |
+| Windows | `%APPDATA%`, `%LOCALAPPDATA%`, **`%LOCALAPPDATA%\..\LocalLow`** (Unity games: `LocalLow\<Studio>\<Game>\user1.dat`, e.g. Hollow Knight Silksong — `.dat`/`.bin` accepted), `Saved Games`, `Documents\Saved Games`, `Documents\My Games`, `Packages\<Publisher>\<Game>` (Microsoft Store games) |
+| Linux | `~/.config`, `~/.local/share`, `~/.var/app` (Flatpak), Steam/Proton: `compatdata/<appid>/pfx/drive_c/users/<user>/{AppData\Roaming,AppData\Local,AppData\LocalLow,Documents,Saved Games}` |
 | macOS | `~/Library/Application Support`, `~/Library/Containers/<bundle>/Data`, Steam macOS (compatdata) |
 
-Heuristique : un dossier est proposé s'il contient des fichiers `.sav/.save/...`
-ou si son nom contient "save". Notre propre dossier de config est exclu.
+Heuristic: a folder is suggested if it contains `.sav`/`.save`/… files or its name contains "save".
+Known false positives (rclone cache, crash reports, launchers, editors, "unsaved-meetings"…) are excluded
+automatically. For a game in an exotic location, add the folder manually (➕ Add) or list its parent in
+`"extra_roots"` in the config file.
 
-## Automatisation
+## Configuration
 
-- **Windows** : `powershell -File packaging\Install-Task.ps1` → sync toutes les 15 min + à l'ouverture de session.
-- **Linux** : `packaging/cloud-save-sync.service` (systemd user, voir commentaires du fichier) ou `packaging/CloudSaveSync.desktop` en autostart (démarre la GUI, auto-sync au lancement).
-- **macOS** : lance l'app au login (Préférences Système → Général → Éléments de connexion).
+Config file (JSON):
 
-## Build d'un exécutable autonome (PyInstaller)
+| Path | File |
+|---|---|
+| Windows | `%APPDATA%\savesync\config.json` |
+| Linux | `~/.config/savesync/config.json` |
+| macOS | `~/Library/Application Support/savesync/config.json` |
+
+```json
+{
+  "remote": "onedrive-local",
+  "remote_dir": "SaveSync",
+  "engine": "bisync",
+  "conflict_resolve": "newer",
+  "compare": "size,modtime",
+  "interval_sec": 300,
+  "watch_debounce_sec": 3,
+  "folders": [{"key": "CPY_SAVES", "path": "C:\\Users\\you\\AppData\\Roaming\\CPY_SAVES", "resynced": true}]
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `remote` | rclone remote (`onedrive`, `gdrive`, `dropbox`…), `onedrive-local` / `gdrive-local` / `dropbox-local` (local folder of the official cloud client, **no OAuth**), `icloud`, or `local:<path>` |
+| `remote_dir` | root folder in the cloud (saves go to `<remote>:<remote_dir>/<key>`) |
+| `engine` | `bisync` (true sync) or `copy` (backup, never deletes) |
+| `conflict_resolve` | `newer` / `older` / `larger` / `smaller` |
+| `extra_roots` | extra folders to scan for saves |
+
+## Automation
+
+- **Windows**: `powershell -File packaging\Install-Task.ps1` → scheduled task syncing every 15 min + at logon.
+- **Linux**: `packaging/cloud-save-sync.service` (systemd user unit — see the comments in the file) or
+  `packaging/CloudSaveSync.desktop` for autostart (launches the GUI with auto-sync).
+- **macOS**: add the app to Login Items (System Settings → General → Login Items).
+
+## Build (standalone binary)
 
 ```bash
-pip install pyinstaller
+pip install -r requirements-build.txt   # pyinstaller
+python scripts/fetch_rclone.py --all     # all platforms, or just the current one
+
 # Windows
 pyinstaller --onefile --windowed --name CloudSaveSync savesync.py --add-data "vendor/windows-amd64/rclone.exe;vendor/windows-amd64"
 # Linux
@@ -135,26 +156,46 @@ pyinstaller --onefile --windowed --name CloudSaveSync savesync.py --add-data "ve
 # macOS (arm64)
 pyinstaller --onefile --windowed --name CloudSaveSync savesync.py --add-data "vendor/macos-arm64/rclone;vendor/macos-arm64"
 ```
-Le binaire embarque rclone (extrait automatiquement au lancement). macOS : penser à
-signer/notariser (`codesign --force --deep --sign "Developer ID" dist/CloudSaveSync.app`)
-si distribution hors cercle de confiance.
 
-## Notes & dépannage
+The binary embeds rclone (extracted at launch). GitHub Actions builds all three automatically on every
+push/tag: see [.github/workflows/build.yml](.github/workflows/build.yml).
 
-- **Erreur `AADSTS700016` lors du `rclone config` OneDrive** (compte pro/école, ex. université) :
-  le tenant bloque l'application rclone par défaut. **Solution recommandée : choisis
-  `onedrive-local` comme provider** (dans ⚙ Paramètres ou au choix 1 de `setup.bat`) →
-  l'app sync tes saves dans le dossier OneDrive déjà synchronisé localement
-  (`%USERPROFILE%\OneDrive\SaveSync\...`), et le client OneDrive officiel fait l'upload.
-  Aucun OAuth. Idem avec `gdrive-local` / `dropbox-local`.
-- Alternative : créer ta propre app Azure AD (client_id/client_secret) et la renseigner
-  dans `rclone config`, ou utiliser Google Drive/Dropbox via rclone.
+## Troubleshooting
 
-- Config : `%APPDATA%\savesync\config.json` (Windows), `~/.config/savesync/config.json`
-  (Linux), `~/Library/Application Support/savesync/config.json` (macOS).
-- Ne lance pas de sync simultanés sur deux machines (bisync pose un lock 2 min côté cloud).
-- Token cloud expiré → relance `rclone config` pour reconnecter le remote.
-- Changer de compte cloud → `resync` pour repartir proprement.
-- Fichiers verrouillés par un jeu en cours : ignorés par rclone, repris au cycle suivant.
-- iCloud : choisis `icloud` comme provider (Windows : iCloud for Windows ; macOS : iCloud Drive
-  activé) → backend en dossier local, pas besoin de rclone.
+- **`AADSTS700016` error during `rclone config` for OneDrive** (work/school account, e.g. university):
+  the tenant blocks rclone's default app. **Recommended fix: use `onedrive-local`** as the provider —
+  the app syncs into the already-locally-synced OneDrive folder (`%USERPROFILE%\OneDrive\SaveSync\...`)
+  and the official OneDrive client does the upload. No OAuth. Same idea with `gdrive-local` / `dropbox-local`.
+  Alternatives: use Google Drive/Dropbox via rclone (no Azure involved), or register your own Azure AD app
+  and set its `client_id`/`client_secret` in `rclone config`.
+- `rclone remote 'onedrive' does not exist` → run `rclone config` once (or `setup.bat`/`setup.sh`).
+- Expired cloud token → `rclone config` again to reconnect the remote.
+- Changed cloud account → `resync` to start clean.
+- Don't run syncs on two machines at the same time (bisync holds a 2-min lock on the cloud).
+- Files locked by a running game are skipped by rclone and picked up on the next cycle.
+- A game is not detected → add its folder manually (➕ Add / `add <path>`).
+
+## Project layout
+
+```
+cloud-save-sync/
+├── savesync.py              # entry point (GUI by default, --cli for the CLI)
+├── savesync/
+│   ├── core.py              # engine: config, detection, bisync, watcher
+│   ├── cli.py               # CLI commands
+│   └── gui.py               # Tkinter GUI
+├── scripts/fetch_rclone.py  # downloads rclone per platform into vendor/
+├── vendor/                  # bundled rclone binaries (win/linux/mac × amd64/arm64)
+├── packaging/               # Install-Task.ps1, systemd unit, .desktop
+├── .github/workflows/       # CI build
+├── setup.bat / setup.sh     # one-click first-time setup
+└── run.ps1 / run.bat        # launchers from source
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and PRs welcome!
+
+## License
+
+[MIT](LICENSE) — do whatever you want, just keep the copyright notice.

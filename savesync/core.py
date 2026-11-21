@@ -1,8 +1,8 @@
-"""Coeur de Cloud Save Sync (multi-plateforme : Windows / Linux / macOS).
+"""Core of Cloud Save Sync (cross-platform: Windows / Linux / macOS).
 
-Moteur de sync : rclone bisync (vrai sync bidirectionnel, suppressions propagees,
-conflits resolus avec conservation du perdant en *.conflictN).
-Mode backup legacy : moteur "copy" (rien n'est jamais supprime).
+Sync engine: rclone bisync (true bidirectional sync, deletions propagated,
+conflicts resolved with the loser kept as *.conflictN).
+Legacy backup mode: "copy" engine (nothing is ever deleted).
 """
 from __future__ import annotations
 
@@ -20,22 +20,22 @@ from pathlib import Path
 APP_NAME = "savesync"
 
 SAVE_EXTS = {".sav", ".save", ".savegame", ".sg", ".zsav", ".ess", ".dsv", ".sav2"}
-# LocalLow (jeux Unity/Chromium) : les saves sont souvent en .dat/.bin (ex: Hollow Knight Silksong)
+# LocalLow (Unity/Chromium games): saves are often .dat/.bin (e.g. Hollow Knight Silksong)
 LOCALLOW_EXTS = SAVE_EXTS | {".dat", ".bin"}
-# dossiers a NE JAMAIS proposer (faux positifs connus) : nom ou composant de chemin
+# folders NEVER suggested (known false positives): dir name or path component
 BLOCK_PATTERNS = (
     "crashreport", "crashdumps", "launcher", "editor", "unsaved", "rclone",
     "savesync", "telemetry", "cache", "logs", "temp",
 )
 
 DEFAULTS = {
-    "remote": "onedrive",          # remote rclone (onedrive, gdrive, dropbox...), "icloud" ou "local:<chemin>"
-    "remote_dir": "SaveSync",      # dossier racine dans le cloud
-    "engine": "bisync",            # "bisync" (sync) ou "copy" (backup)
+    "remote": "onedrive",          # rclone remote (onedrive, gdrive, dropbox...), "onedrive-local", "icloud" or "local:<path>"
+    "remote_dir": "SaveSync",      # root folder in the cloud
+    "engine": "bisync",            # "bisync" (sync) or "copy" (backup)
     "conflict_resolve": "newer",   # newer / older / larger / smaller
-    "compare": "size,modtime",     # champs de comparaison rclone
-    "interval_sec": 300,           # synchro periodique en mode watch
-    "watch_debounce_sec": 3,       # delai anti-rebond du watch
+    "compare": "size,modtime",     # rclone compare fields
+    "interval_sec": 300,           # periodic sync in watch mode
+    "watch_debounce_sec": 3,       # watch debounce delay
     "folders": [],                 # [{key, path, resynced}]
 }
 
@@ -90,13 +90,13 @@ def _rclone_config_file() -> Path:
 
 
 def find_rclone() -> str | None:
-    """rclone embarque (vendor/) puis PATH."""
+    """Bundled rclone (vendor/) first, then PATH."""
     exe_names = ["rclone.exe"] if system() == "Windows" else ["rclone"]
     bases = []
-    meipass = getattr(sys, "_MEIPASS", None)  # dossier d'extraction PyInstaller (onefile)
+    meipass = getattr(sys, "_MEIPASS", None)  # PyInstaller onefile extraction dir
     if meipass:
         bases.append(Path(meipass))
-    bases.append(Path(__file__).resolve().parent.parent)  # racine du projet
+    bases.append(Path(__file__).resolve().parent.parent)  # project root
     for base in bases:
         for name in exe_names:
             candidates = [base / "vendor" / name, base / "bin" / name, base / name]
@@ -117,9 +117,9 @@ def rclone(args: list[str], timeout: int = 900) -> tuple[int, str]:
     exe = find_rclone()
     if not exe:
         raise RcloneError(
-            "rclone introuvable. Lance scripts/fetch_rclone.py (ou installe rclone dans le PATH)."
+            "rclone not found. Run scripts/fetch_rclone.py (or install rclone in the PATH)."
         )
-    # evite le NOTICE "Config file not found"
+    # avoid the "Config file not found" NOTICE
     conf = _rclone_config_file()
     try:
         conf.parent.mkdir(parents=True, exist_ok=True)
@@ -137,26 +137,10 @@ def rclone(args: list[str], timeout: int = 900) -> tuple[int, str]:
 
 # --------------------------------------------------------------- backends ---
 
-def _icloud_drive() -> Path:
-    s = system()
-    cands = []
-    if s == "Windows":
-        cands = [Path.home() / "iCloud Drive", Path.home() / "iCloudDrive"]
-    elif s == "Darwin":
-        cands = [Path.home() / "Library" / "Mobile Documents" / "com~apple~CloudDocs"]
-    for c in cands:
-        if c.is_dir():
-            return c
-    raise RcloneError(
-        "Dossier iCloud introuvable. Windows : installe 'iCloud for Windows'. "
-        "macOS : iCloud Drive doit etre active dans les reglages iCloud."
-    )
-
-
-# Backends "dossier local déjà synchronisé par le client cloud" (OneDrive, Google Drive,
-# Dropbox) : zero OAuth, ideal pour les comptes pro/ecole bloques par AADSTS700016.
+# "local folder already synced by the cloud client" backends (OneDrive, Google Drive,
+# Dropbox): zero OAuth, ideal for work/school accounts blocked by AADSTS700016.
 LOCAL_SYNC_REMOTES = {
-    "onedrive-local": ["OneDrive"],   # prefere le OneDrive perso, sinon le 1er OneDrive*
+    "onedrive-local": ["OneDrive"],   # prefer the personal OneDrive, else the first OneDrive*
     "gdrive-local": ["Google Drive", "GoogleDrive"],
     "dropbox-local": ["Dropbox"],
 }
@@ -173,8 +157,24 @@ def _local_sync_base(remote: str) -> Path:
         if matches:
             return matches[0]
     raise RcloneError(
-        f"Dossier local du client {remote} introuvable sous {home}. "
-        "Installe/synchronise le client cloud (OneDrive, Google Drive for desktop, Dropbox)."
+        f"Local folder of the {remote} client not found under {home}. "
+        "Install/sync the cloud client first (OneDrive, Google Drive for desktop, Dropbox)."
+    )
+
+
+def _icloud_drive() -> Path:
+    s = system()
+    cands = []
+    if s == "Windows":
+        cands = [Path.home() / "iCloud Drive", Path.home() / "iCloudDrive"]
+    elif s == "Darwin":
+        cands = [Path.home() / "Library" / "Mobile Documents" / "com~apple~CloudDocs"]
+    for c in cands:
+        if c.is_dir():
+            return c
+    raise RcloneError(
+        "iCloud folder not found. Windows: install 'iCloud for Windows'. "
+        "macOS: enable iCloud Drive in System Settings."
     )
 
 
@@ -184,7 +184,7 @@ def is_local_backend(cfg: dict) -> bool:
 
 
 def remote_spec(cfg: dict, key: str) -> str:
-    """Spec rclone du dossier distant pour une cle : 'onedrive:SaveSync/cle' ou chemin local."""
+    """Remote spec for a key: 'onedrive:SaveSync/key' or a local path."""
     remote = str(cfg["remote"])
     if remote == "icloud":
         return str(_icloud_drive() / cfg["remote_dir"] / key)
@@ -213,8 +213,8 @@ def _bisync(cfg: dict, local: str, remote: str, resync: bool = False,
     if dry_run:
         args += ["--dry-run"]
     code, out = rclone(args)
-    # bisync refuse parfois d'avancer ("Safety abort: all files were changed on one side")
-    # -> legitime pour des dossiers de saves : on retente avec --force
+    # bisync sometimes refuses to proceed ("Safety abort: all files were changed on one side")
+    # -> legitimate for save folders: retry with --force
     if code != 0 and "Safety abort" in out and not dry_run:
         code, out = rclone(args + ["--force"])
     return code, out
@@ -227,7 +227,7 @@ def sync_one(cfg: dict, folder: dict, dry_run: bool = False, log=print) -> dict:
     result = {"key": key, "ok": False, "resynced": False, "output": ""}
 
     if not Path(local).is_dir():
-        result["output"] = f"dossier inexistant, ignore : {local}"
+        result["output"] = f"folder does not exist, skipped: {local}"
         log(f"  [{key}] {result['output']}")
         return result
 
@@ -239,29 +239,27 @@ def sync_one(cfg: dict, folder: dict, dry_run: bool = False, log=print) -> dict:
         log(f"  sync(copy)  [{key}]")
         return result
 
-    # le backend local exige que la racine distante existe
+    # the local backend requires the remote root to exist
     rclone(["mkdir", remote])
 
     if not folder.get("resynced"):
-        # 1er sync pour cette cle. Si nouveau PC (local vide + cloud plein),
-        # pre-remplit depuis le cloud pour ne pas ecraser le cloud.
-        local_empty = not any(Path(local).rglob("*")) or not any(
-            p.is_file() for p in Path(local).rglob("*")
-        )
+        # first sync for this key. If new PC (local empty + cloud full),
+        # pre-fill from the cloud so the cloud is never overwritten by an empty folder.
+        local_empty = not any(p.is_file() for p in Path(local).rglob("*"))
         code_lsf, out_lsf = rclone(["lsf", "--files-only", remote])
         remote_empty = code_lsf != 0 or not out_lsf.strip()
         if local_empty and not remote_empty:
-            log(f"  [{key}] nouveau PC detecte : pre-remplissage depuis le cloud...")
+            log(f"  [{key}] new PC detected: pre-filling from the cloud...")
             rclone(["copy", remote, local, "--create-empty-src-dirs", "--stats", "0"])
         code, out = _bisync(cfg, local, remote, resync=not dry_run, dry_run=dry_run)
         if code != 0 and not dry_run:
             result["output"] = out
-            log(f"  resync [{key}] a echoue :\n{out}")
+            log(f"  resync [{key}] failed:\n{out}")
             return result
         folder["resynced"] = True
         result["resynced"] = True
         save_config(cfg)
-        log(f"  resync initial  [{key}]  ->  {remote}")
+        log(f"  initial resync  [{key}]  ->  {remote}")
         result.update(ok=True, output=out)
         return result
 
@@ -271,38 +269,38 @@ def sync_one(cfg: dict, folder: dict, dry_run: bool = False, log=print) -> dict:
         return result
     if code != 0:
         result["output"] = out
-        log(f"  sync [{key}] a echoue :\n{out}")
+        log(f"  sync [{key}] failed:\n{out}")
         return result
     result.update(ok=True, output=out)
     if ".conflict" in out:
-        log(f"  sync  [{key}]  (conflits -> *.conflictN, commande 'conflicts')")
+        log(f"  sync  [{key}]  (conflicts -> *.conflictN, see 'conflicts')")
     else:
         log(f"  sync  [{key}]")
     return result
 
 
 def check_remote(cfg: dict, log=print) -> bool:
-    """Vérifie que le remote rclone existe (sinon message clair au lieu d'erreurs cryptiques)."""
+    """Check that the rclone remote exists (clear message instead of cryptic errors)."""
     remote = str(cfg.get("remote", ""))
     if is_local_backend(cfg):
         return True
     try:
         code, out = rclone(["listremotes"])
     except RcloneError as e:
-        log(f"ERREUR : {e}")
+        log(f"ERROR: {e}")
         return False
     remotes = {ln.strip().rstrip(":") for ln in out.splitlines() if ln.strip()}
     if remote in remotes:
         return True
-    log(f"ERREUR : le remote rclone '{remote}' n'existe pas encore dans rclone.conf.")
-    log("  Connecte ton compte cloud UNE fois :  double-clic sur setup.bat")
-    log("  (ou: vendor\\windows-amd64\\rclone.exe config  -> 'n' -> nomme-le '" + remote + "')")
-    log("  puis relance le sync.")
+    log(f"ERROR: rclone remote '{remote}' does not exist yet in rclone.conf.")
+    log("  Connect your cloud account ONCE: run setup.bat (or setup.sh)")
+    log(f"  (or: rclone config  -> 'n' -> name it '{remote}')")
+    log("  then run sync again.")
     return False
 
 
 def is_folder_junk(f: dict) -> bool:
-    """Dossier à retirer du suivi : inexistant, ou faux positif (blocklist, config app/rclone)."""
+    """Folder to drop from watching: missing, or a false positive (blocklist, app/rclone config)."""
     p = Path(f.get("path", ""))
     if not p.is_dir():
         return True
@@ -316,7 +314,7 @@ def is_folder_junk(f: dict) -> bool:
 
 
 def clean_config(cfg: dict | None = None, log=print) -> dict:
-    """Retire les dossiers devenus inutiles (faux positifs, chemins supprimés)."""
+    """Remove folders that became useless (false positives, deleted paths)."""
     cfg = cfg or load_config()
     folders = [f for f in cfg.get("folders", []) if f.get("path")]
     kept = [f for f in folders if not is_folder_junk(f)]
@@ -325,8 +323,8 @@ def clean_config(cfg: dict | None = None, log=print) -> dict:
     save_config(cfg)
     for f in folders:
         if f not in kept:
-            log(f"  retire : [{f.get('key')}] {f.get('path')}")
-    log(f"Nettoyage termine : {removed} dossier(s) retire(s), {len(kept)} conserve(s).")
+            log(f"  removed: [{f.get('key')}] {f.get('path')}")
+    log(f"Cleanup done: {removed} folder(s) removed, {len(kept)} kept.")
     return cfg
 
 
@@ -334,7 +332,7 @@ def sync_all(cfg: dict | None = None, dry_run: bool = False, log=print) -> list[
     cfg = cfg or load_config()
     folders = [f for f in cfg.get("folders", []) if f.get("path")]
     if not folders:
-        log("Aucun dossier surveille. Lance 'scan --auto' ou 'add <chemin>'.")
+        log("No folder watched. Run 'scan --auto' or 'add <path>'.")
         return []
     if not check_remote(cfg, log):
         return []
@@ -365,11 +363,11 @@ def list_conflicts(cfg: dict | None = None, log=print) -> dict:
             found[f["key"]] = {"local": local_c, "remote": remote_c}
             log(f"[{f['key']}]")
             for c in local_c:
-                log(f"  local : {c}")
+                log(f"  local: {c}")
             for c in remote_c:
-                log(f"  cloud : {c}")
+                log(f"  cloud: {c}")
     if not found:
-        log("Aucun conflit.")
+        log("No conflicts.")
     return found
 
 
@@ -389,7 +387,7 @@ def _xdg(env: str, default: Path) -> Path:
 
 
 def scan_roots(cfg: dict | None = None) -> list[Path]:
-    """Racines connues de sauvegardes de jeux, par plateforme (+ extra_roots de la config)."""
+    """Known game-save roots, per platform (+ extra_roots from the config)."""
     home = Path.home()
     s = system()
     roots: list[Path] = []
@@ -403,8 +401,8 @@ def scan_roots(cfg: dict | None = None) -> list[Path]:
         for v in ("APPDATA", "LOCALAPPDATA"):
             if os.environ.get(v):
                 add(Path(os.environ[v]))
-        # LocalLow est un FRERE de LOCALAPPDATA : AppData\LocalLow (jeux Unity/Chromium)
-        # LocalLow\<Studio>\<Jeu>\default\user1.dat (ex: Hollow Knight Silksong)
+        # LocalLow is a SIBLING of LOCALAPPDATA: AppData\LocalLow (Unity/Chromium games)
+        # LocalLow\<Studio>\<Game>\default\user1.dat (e.g. Hollow Knight Silksong)
         if os.environ.get("LOCALAPPDATA"):
             add(Path(os.environ["LOCALAPPDATA"]).parent / "LocalLow")
         add(home / "Saved Games")
@@ -412,7 +410,7 @@ def scan_roots(cfg: dict | None = None) -> list[Path]:
         add(home / "Documents" / "My Games")
         packages = Path(os.environ.get("LOCALAPPDATA", "")) / "Packages"
         if packages.is_dir():
-            # jeux Microsoft Store : Packages/<Editeur>/<Jeu>/... -> chaque <Jeu> devient une racine
+            # Microsoft Store games: Packages\<Publisher>\<Game>\... -> each <Game> becomes a root
             for pub in packages.iterdir():
                 if pub.is_dir():
                     for game in pub.iterdir():
@@ -422,14 +420,14 @@ def scan_roots(cfg: dict | None = None) -> list[Path]:
         add(home / "Library" / "Application Support")
         containers = home / "Library" / "Containers"
         if containers.is_dir():
-            # apps sandboxees : Containers/<bundle>/Data/... -> Data devient une racine
+            # sandboxed apps: Containers/<bundle>/Data/... -> Data becomes a root
             for bundle in containers.iterdir():
                 data = bundle / "Data"
                 if data.is_dir():
                     add(data)
         _add_steam(roots, home / "Library" / "Application Support" / "Steam", add)
     else:  # Linux
-        add(_xdg("XDG_CONFIG_HOME", home / ".config"))   # certains jeux (Unity...) écrivent ici
+        add(_xdg("XDG_CONFIG_HOME", home / ".config"))   # some games (Unity...) write here
         add(_xdg("XDG_DATA_HOME", home / ".local" / "share"))
         add(home / ".var" / "app")                        # Flatpak
         _add_steam(roots, home / ".steam" / "steam", add)
@@ -441,7 +439,7 @@ def scan_roots(cfg: dict | None = None) -> list[Path]:
 
 
 def _add_steam(roots: list[Path], steam_dir: Path, add) -> None:
-    """Steam + Proton : compatdata/<appid>/pfx/drive_c/users/<user>/... devient racine."""
+    """Steam + Proton: compatdata/<appid>/pfx/drive_c/users/<user>/... becomes a root."""
     compat = steam_dir / "steamapps" / "compatdata"
     if not compat.is_dir():
         return
@@ -465,10 +463,9 @@ def _add_steam(roots: list[Path], steam_dir: Path, add) -> None:
 
 def looks_like_save_dir(d: Path, exts: set[str] = SAVE_EXTS,
                         max_files: int = 150, max_depth: int = 2) -> bool:
-    """Vrai si le dossier contient des fichiers de sauvegarde, en regardant
-    récursivement jusqu'à max_depth niveaux (ex: jeu Unity dont les saves sont
-    dans <jeu>/default/user1.dat). max_depth=0 -> fichiers directs uniquement.
-    Les sous-dossiers "bloqués" (cache, logs...) sont ignorés."""
+    """True if the folder contains save files, looking recursively up to max_depth
+    levels (e.g. Unity game whose saves are in <game>/default/user1.dat).
+    max_depth=0 -> direct files only. Blocked subdirs (cache, logs...) are skipped."""
     try:
         if "save" in d.name.lower():
             return True
@@ -476,7 +473,7 @@ def looks_like_save_dir(d: Path, exts: set[str] = SAVE_EXTS,
         seen = 0
         for cur, dirs, files in os.walk(d):
             depth = cur[len(base):].count(os.sep)
-            # prune : profondeur max + dossiers bloques
+            # prune: max depth + blocked dirs
             dirs[:] = [] if depth >= max_depth else [
                 dn for dn in dirs
                 if not any(b in dn.lower() for b in BLOCK_PATTERNS)
@@ -493,7 +490,7 @@ def looks_like_save_dir(d: Path, exts: set[str] = SAVE_EXTS,
 
 
 def _is_blocked(root: Path, p: Path) -> bool:
-    """Exclut les faux positifs connus (cache rclone, crashreports, launchers...)."""
+    """Exclude known false positives (rclone cache, crashreports, launchers...)."""
     try:
         rel = os.path.relpath(str(p), str(root))
     except ValueError:
@@ -503,7 +500,7 @@ def _is_blocked(root: Path, p: Path) -> bool:
 
 
 def scan(cfg: dict | None = None) -> list[tuple[Path, Path]]:
-    """Retourne [(root, dossier_detecte), ...] (profondeur 2 sous chaque racine)."""
+    """Returns [(root, detected_folder), ...] (depth 2 under each root)."""
     cfg = cfg if cfg is not None else load_config()
     found = []
     for root in scan_roots(cfg):
@@ -515,12 +512,12 @@ def scan(cfg: dict | None = None) -> list[tuple[Path, Path]]:
         for c in children:
             if _is_blocked(root, c):
                 continue
-            # 1) le fils lui-même si ses fichiers directs/nom disent "save" (dossier du jeu)
+            # 1) the child itself if its direct files/name say "save" (game folder)
             if looks_like_save_dir(c, exts, max_depth=0):
                 found.append((root, c))
                 continue
-            # 2) sinon les petits-enfants (granularité par jeu : Studio\Jeu),
-            #    en cherchant les saves jusqu'à 2 niveaux à l'intérieur
+            # 2) else grandchildren (per-game granularity: Studio\Game),
+            #    looking for saves up to 2 levels inside them
             matched_gc = []
             try:
                 for g in c.iterdir():
@@ -530,10 +527,10 @@ def scan(cfg: dict | None = None) -> list[tuple[Path, Path]]:
                 pass
             if matched_gc:
                 found.extend((root, g) for g in matched_gc)
-            # 3) sinon le fils en récursif (saves enfouies directement sous le fils)
+            # 3) else the child recursively (saves nested directly under the child)
             elif looks_like_save_dir(c, exts, max_depth=2):
                 found.append((root, c))
-    # dedoublonne + exclut notre propre dossier de config (le nom contient "save")
+    # dedupe + exclude our own config dir (its name contains "save")
     conf = config_dir().resolve()
     seen = set()
     out = []
@@ -562,14 +559,14 @@ def add_folder(path: str, cfg: dict | None = None, log=print) -> dict:
     cfg = cfg or load_config()
     full = str(Path(path).expanduser().resolve())
     if not Path(full).is_dir():
-        raise FileNotFoundError(f"Chemin inexistant : {full}")
+        raise FileNotFoundError(f"Path does not exist: {full}")
     if any(f.get("path") == full for f in cfg.get("folders", [])):
-        log(f"Deja surveille : {full}")
+        log(f"Already watched: {full}")
         return cfg
     key = key_for(full)
     cfg.setdefault("folders", []).append({"key": key, "path": full, "resynced": False})
     save_config(cfg)
-    log(f"Ajoute : [{key}]  {full}")
+    log(f"Added: [{key}]  {full}")
     return cfg
 
 
@@ -577,16 +574,16 @@ def remove_folder(key: str, cfg: dict | None = None, log=print) -> dict:
     cfg = cfg or load_config()
     cfg["folders"] = [f for f in cfg.get("folders", []) if f.get("key") != key]
     save_config(cfg)
-    log(f"Retire : {key}")
+    log(f"Removed: {key}")
     return cfg
 
 
 # ----------------------------------------------------------------- watch ----
 
 class Watcher(threading.Thread):
-    """Surveille les dossiers (polling mtime) et synchro :
-    - ~debounce secondes apres le dernier changement d'un dossier -> sync de ce dossier
-    - toutes les interval_sec secondes -> sync complet (secours)
+    """Watches folders (mtime polling) and syncs:
+    - ~debounce seconds after the last change of a folder -> sync that folder
+    - every interval_sec seconds -> full sync (safety net)
     """
 
     def __init__(self, log=print, on_sync=None):
@@ -613,16 +610,15 @@ class Watcher(threading.Thread):
         return snap
 
     def run(self):
-        self.log("Watch actif (Ctrl+C / Stop pour arreter).")
+        self.log("Watch active (Ctrl+C / Stop to quit).")
         snaps: dict[str, dict] = {}
         pending: dict[str, float] = {}
-        synced_at: dict[str, float] = {}
         last_full = 0.0
         while not self._stop_event.is_set():
             try:
                 cfg = load_config()
             except Exception as e:
-                self.log(f"config illisible : {e}")
+                self.log(f"config unreadable: {e}")
                 time.sleep(5)
                 continue
             debounce = float(cfg.get("watch_debounce_sec", 3))
@@ -634,26 +630,24 @@ class Watcher(threading.Thread):
                 snap = self._snapshot(path)
                 if key not in snaps:
                     snaps[key] = snap
-                    synced_at[key] = now
                     continue
                 if snap != snaps[key]:
                     snaps[key] = snap
                     pending[key] = now
                 if key in pending and now - pending[key] >= debounce:
                     del pending[key]
-                    self.log(f"--- changement detecte [{key}] {time.strftime('%H:%M:%S')} ---")
+                    self.log(f"--- change detected [{key}] {time.strftime('%H:%M:%S')} ---")
                     try:
                         self.on_sync(sync_one(cfg, f, log=self.log))
                     except Exception as e:
-                        self.log(f"erreur synchro [{key}] : {e}")
-                    synced_at[key] = now
+                        self.log(f"sync error [{key}]: {e}")
             if now - last_full >= interval:
-                self.log(f"--- synchro periodique {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
+                self.log(f"--- periodic sync {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
                 try:
                     for r in sync_all(cfg, log=self.log):
                         self.on_sync(r)
                 except Exception as e:
-                    self.log(f"erreur synchro periodique : {e}")
+                    self.log(f"periodic sync error: {e}")
                 last_full = now
             self._stop_event.wait(1.0)
-        self.log("Watch arrete.")
+        self.log("Watch stopped.")

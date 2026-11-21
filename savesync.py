@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Cloud Save Sync — point d'entrée.
+"""Cloud Save Sync — entry point.
 
-Sans argument        -> lance l'interface graphique (fallback CLI si pas d'affichage).
-`savesync.py gui`    -> interface graphique
-`savesync.py --cli …`-> ligne de commande (init, scan, sync, watch, ...)
+No arguments      -> launches the GUI (falls back to CLI if no display).
+`savesync.py gui` -> GUI
+`savesync.py --cli ...` -> command line (init, scan, sync, watch, ...)
 """
 import sys
 

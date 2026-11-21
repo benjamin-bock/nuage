@@ -1,11 +1,11 @@
-"""Interface graphique Tkinter de Cloud Save Sync (Windows / Linux / macOS)."""
+"""Tkinter GUI for Cloud Save Sync (Windows / Linux / macOS)."""
 from __future__ import annotations
 
 import queue
 import threading
 import tkinter as tk
 import time
-from tkinter import filedialog, messagebox, scrolledtext, simpledialog, ttk
+from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from . import core
 
@@ -13,21 +13,21 @@ from . import core
 class SettingsDialog(tk.Toplevel):
     def __init__(self, master, cfg: dict, on_save):
         super().__init__(master)
-        self.title("Paramètres")
+        self.title("Settings")
         self.cfg = dict(cfg)
         self.on_save = on_save
         self.resizable(False, False)
         self.transient(master)
 
         rows = [
-            ("Provider / remote rclone", "remote",
-             "onedrive-local (recommandé, sans OAuth), onedrive, gdrive, dropbox, icloud, local:<chemin>"),
-            ("Dossier racine cloud", "remote_dir", ""),
-            ("Moteur", "engine", "bisync (sync) ou copy (backup)"),
-            ("Conflits", "conflict_resolve", "newer / older / larger / smaller"),
-            ("Comparaison rclone", "compare", "ex: size,modtime"),
-            ("Intervalle synchro (s)", "interval_sec", "mode watch"),
-            ("Debounce watch (s)", "watch_debounce_sec", ""),
+            ("Provider / rclone remote", "remote",
+             "onedrive-local (recommended, no OAuth), onedrive, gdrive, dropbox, icloud, local:<path>"),
+            ("Cloud root folder", "remote_dir", ""),
+            ("Engine", "engine", "bisync (sync) or copy (backup)"),
+            ("Conflicts", "conflict_resolve", "newer / older / larger / smaller"),
+            ("rclone compare", "compare", "e.g. size,modtime"),
+            ("Sync interval (s)", "interval_sec", "watch mode"),
+            ("Watch debounce (s)", "watch_debounce_sec", ""),
         ]
         self.vars = {}
         for i, (label, key, hint) in enumerate(rows):
@@ -38,7 +38,7 @@ class SettingsDialog(tk.Toplevel):
                 ttk.Label(self, text=hint, foreground="gray").grid(row=i, column=2, sticky="w", padx=4)
             self.vars[key] = v
 
-        ttk.Button(self, text="Enregistrer", command=self._save).grid(
+        ttk.Button(self, text="Save", command=self._save).grid(
             row=len(rows), column=0, columnspan=3, pady=10)
 
     def _save(self):
@@ -52,14 +52,14 @@ class SettingsDialog(tk.Toplevel):
 
 
 class ScanDialog(tk.Toplevel):
-    """Liste des dossiers detectes, avec cases a cocher."""
+    """List of detected folders, with checkboxes."""
 
     def __init__(self, master, found: list[tuple], on_add):
         super().__init__(master)
-        self.title("Dossiers de sauvegardes détectés")
+        self.title("Detected save folders")
         self.on_add = on_add
         self.transient(master)
-        ttk.Label(self, text=f"{len(found)} dossier(s) détecté(s) — coche ceux à surveiller :").pack(
+        ttk.Label(self, text=f"{len(found)} folder(s) detected — check the ones to watch:").pack(
             anchor="w", padx=8, pady=4)
         frame = ttk.Frame(self)
         frame.pack(fill="both", expand=True, padx=8)
@@ -73,7 +73,7 @@ class ScanDialog(tk.Toplevel):
             self.listbox.insert("end", str(p))
         for i in range(len(found)):
             self.listbox.selection_set(i)
-        ttk.Button(self, text="Ajouter la sélection", command=self._add).pack(pady=8)
+        ttk.Button(self, text="Add selected", command=self._add).pack(pady=8)
 
     def _add(self):
         sel = self.listbox.curselection()
@@ -103,13 +103,13 @@ class App(tk.Tk):
         toolbar.pack(fill="x", padx=6, pady=6)
         self.btn = {}
         for label, cmd in [
-            ("⚙ Paramètres", self.open_settings),
-            ("🔎 Scanner", self.do_scan),
-            ("➕ Ajouter…", self.do_add),
-            ("➖ Retirer", self.do_remove),
-            ("🔄 Sync maintenant", self.do_sync),
-            ("👁 Statut", self.do_status),
-            ("🧹 Nettoyer", self.do_clean),
+            ("⚙ Settings", self.open_settings),
+            ("🔎 Scan", self.do_scan),
+            ("➕ Add…", self.do_add),
+            ("➖ Remove", self.do_remove),
+            ("🔄 Sync now", self.do_sync),
+            ("👁 Status", self.do_status),
+            ("🧹 Clean", self.do_clean),
             ("▶ Auto-sync", self.do_start_watch),
             ("⏹ Stop", self.do_stop_watch),
         ]:
@@ -122,7 +122,7 @@ class App(tk.Tk):
 
         top = ttk.Frame(paned)
         paned.add(top, weight=3)
-        ttk.Label(top, text="Dossiers surveillés :").pack(anchor="w")
+        ttk.Label(top, text="Watched folders:").pack(anchor="w")
         cols = ("key", "path", "state")
         self.tree = ttk.Treeview(top, columns=cols, show="headings", selectmode="browse")
         for c, w in (("key", 200), ("path", 560), ("state", 90)):
@@ -135,7 +135,7 @@ class App(tk.Tk):
 
         bottom = ttk.Frame(paned)
         paned.add(bottom, weight=2)
-        ttk.Label(bottom, text="Journal :").pack(anchor="w")
+        ttk.Label(bottom, text="Log:").pack(anchor="w")
         self.log_text = scrolledtext.ScrolledText(bottom, height=12, state="disabled",
                                                   wrap="word", font=("Consolas", 9))
         self.log_text.pack(fill="both", expand=True)
@@ -151,8 +151,8 @@ class App(tk.Tk):
         rd = self.cfg.get("remote_dir", "")
         n = len([f for f in self.cfg.get("folders", []) if f.get("path")])
         self.status.config(
-            text=f"Cloud : {r}:{rd}   |   moteur : {self.cfg.get('engine')}   |   "
-                 f"{n} dossier(s)   |   config : {core.config_path()}")
+            text=f"Cloud: {r}:{rd}   |   engine: {self.cfg.get('engine')}   |   "
+                 f"{n} folder(s)   |   config: {core.config_path()}")
 
     def log(self, msg: str, tag: str | None = None):
         self.msgq.put((msg, tag))
@@ -176,7 +176,7 @@ class App(tk.Tk):
         for f in self.cfg.get("folders", []):
             if not f.get("path"):
                 continue
-            state = "sync" if f.get("resynced") else "resync"
+            state = "synced" if f.get("resynced") else "resync"
             self.tree.insert("", "end", iid=f["key"],
                              values=(f["key"], f["path"], state))
         self._set_status()
@@ -184,7 +184,7 @@ class App(tk.Tk):
     # --------------------------------------------------------- actions ----
     def _run_bg(self, fn, done=None):
         if self.worker and self.worker.is_alive():
-            messagebox.showinfo("Cloud Save Sync", "Une opération est déjà en cours.")
+            messagebox.showinfo("Cloud Save Sync", "An operation is already running.")
             return
         self.worker = threading.Thread(target=self._bg_wrap, args=(fn, done), daemon=True)
         self.worker.start()
@@ -193,7 +193,7 @@ class App(tk.Tk):
         try:
             fn()
         except Exception as e:
-            self.log(f"ERREUR : {e}", "error")
+            self.log(f"ERROR: {e}", "error")
         finally:
             if done:
                 self.after(0, done)
@@ -205,15 +205,15 @@ class App(tk.Tk):
         core.save_config(new_cfg)
         self.cfg = core.load_config()
         self._set_status()
-        self.log("Paramètres enregistrés.")
+        self.log("Settings saved.")
 
     def do_scan(self):
-        self.log("Scan des dossiers de sauvegardes...")
+        self.log("Scanning for save folders...")
         found = core.scan()
         if not found:
-            self.log("Aucun dossier détecté. Ajoute-en un manuellement (➕).")
+            self.log("Nothing detected. Add a folder manually (➕).")
             return
-        self.log(f"{len(found)} dossier(s) détecté(s).")
+        self.log(f"{len(found)} folder(s) detected.")
         ScanDialog(self, found, on_add=lambda sel: self._add_scanned(sel))
 
     def _add_scanned(self, sel):
@@ -224,13 +224,13 @@ class App(tk.Tk):
         self.refresh_tree()
 
     def do_add(self):
-        path = filedialog.askdirectory(title="Choisir le dossier de sauvegardes du jeu")
+        path = filedialog.askdirectory(title="Choose the game's save folder")
         if not path:
             return
         try:
             core.add_folder(path, log=lambda m: self.log(m))
         except FileNotFoundError as e:
-            messagebox.showerror("Erreur", str(e))
+            messagebox.showerror("Error", str(e))
         self.refresh_tree()
 
     def do_remove(self):
@@ -238,8 +238,8 @@ class App(tk.Tk):
         if not sel:
             return
         key = sel[0]
-        if messagebox.askyesno("Retirer", f"Retirer [{key}] de la surveillance ?\n"
-                                 "(les fichiers déjà dans le cloud sont conservés)"):
+        if messagebox.askyesno("Remove", f"Stop watching [{key}]?\n"
+                                 "(files already in the cloud are kept)"):
             core.remove_folder(key, log=lambda m: self.log(m))
             self.refresh_tree()
 
@@ -248,7 +248,7 @@ class App(tk.Tk):
         self._run_bg(lambda: core.sync_all(log=self.log), done=self.refresh_tree)
 
     def do_status(self):
-        self.log("--- statut (dry-run) ---")
+        self.log("--- status (dry-run) ---")
         def run():
             cfg = core.load_config()
             for f in cfg.get("folders", []):
@@ -257,13 +257,13 @@ class App(tk.Tk):
                 r = core.sync_one(cfg, f, dry_run=True)
                 out = "\n".join(ln for ln in r["output"].splitlines()
                                 if "NOTICE" not in ln and "Bisync" not in ln).strip()
-                self.log(f"[{f['key']}] {'à jour' if not out else 'changements :'}")
+                self.log(f"[{f['key']}] {'up to date' if not out else 'changes:'}")
                 if out:
                     self.log(out)
         self._run_bg(run)
 
     def do_clean(self):
-        self.log("Nettoyage des dossiers (faux positifs / chemins supprimés)...")
+        self.log("Cleaning folders (false positives / deleted paths)...")
         def run():
             core.clean_config(log=self.log)
         self._run_bg(run, done=self.refresh_tree)
@@ -271,14 +271,14 @@ class App(tk.Tk):
     def do_start_watch(self):
         if self.watcher and self.watcher.is_alive():
             return
-        self.log("Auto-sync démarré (watch + synchro périodique).")
+        self.log("Auto-sync started (watch + periodic sync).")
         self.watcher = core.Watcher(log=self.log)
         self.watcher.start()
 
     def do_stop_watch(self):
         if self.watcher:
             self.watcher.stop()
-            self.log("Arrêt de l'auto-sync demandé...")
+            self.log("Auto-sync stop requested...")
             self.watcher = None
 
     def _on_close(self):

@@ -2,37 +2,37 @@
 chcp 65001 >nul
 cd /d "%~dp0"
 echo ============================================================
-echo   Cloud Save Sync - installation automatique (Windows)
+echo   Cloud Save Sync - automatic setup (Windows)
 echo ============================================================
 
-:: --- trouve Python (py launcher, install connu, puis PATH) ---
+:: --- find Python (py launcher, known install, then PATH) ---
 set "PY="
 where py >nul 2>nul && set "PY=py" && goto :pyok
 if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" set "PY=%LOCALAPPDATA%\Programs\Python\Python312\python.exe" && goto :pyok
 where python >nul 2>nul && set "PY=python"
 :pyok
 if "%PY%"=="" (
-    echo ERREUR : Python 3.10+ introuvable. Installe-le depuis https://www.python.org/downloads/
+    echo ERROR: Python 3.10+ not found. Install it from https://www.python.org/downloads/
     pause
     exit /b 1
 )
-echo Python : %PY%
+echo Python: %PY%
 
-:: --- rclone embarque ? sinon on le telecharge ---
+:: --- bundled rclone? otherwise download it ---
 if not exist "vendor\windows-amd64\rclone.exe" (
-    echo Telechargement de rclone...
-    %PY% scripts\fetch_rclone.py || (echo ERREUR fetch_rclone; pause; exit /b 1)
+    echo Downloading rclone...
+    %PY% scripts\fetch_rclone.py || (echo ERROR fetch_rclone; pause; exit /b 1)
 )
 
-:: --- choix du provider ---
+:: --- choose the provider ---
 echo.
-echo Choisis ton cloud :
-echo   1) onedrive-local  = dossier OneDrive DEJA synchronise en local (RECOMMANDE,
-echo                        aucun OAuth, marche aussi avec un compte pro/ecole)
-echo   2) gdrive-local    = dossier Google Drive local (Google Drive for desktop)
-echo   3) dropbox-local   = dossier Dropbox local
-echo   4) autre remote rclone (onedrive OAuth, gdrive, dropbox...) - necessite rclone config
-set /p CHOIX="Ton choix [1]: "
+echo Choose your cloud:
+echo   1) onedrive-local  = OneDrive folder ALREADY synced locally (RECOMMENDED,
+echo                        no OAuth, also works with work/school accounts)
+echo   2) gdrive-local    = local Google Drive folder (Google Drive for desktop)
+echo   3) dropbox-local   = local Dropbox folder
+echo   4) other rclone remote (onedrive OAuth, gdrive, dropbox...) - needs rclone config
+set /p CHOIX="Your choice [1]: "
 if "%CHOIX%"=="" set CHOIX=1
 if "%CHOIX%"=="1" set "REMOTE=onedrive-local"
 if "%CHOIX%"=="2" set "REMOTE=gdrive-local"
@@ -40,26 +40,26 @@ if "%CHOIX%"=="3" set "REMOTE=dropbox-local"
 if "%CHOIX%"=="4" (
     set "REMOTE=onedrive"
     echo.
-    echo Connexion du compte cloud a rclone : choisis "n" (new remote),
-    echo nomme-le "onedrive" (ou gdrive, dropbox...) puis connecte-toi dans le navigateur.
-    echo (erreur AADSTS700016 sur un compte pro/ecole ? -> choisis 1) onedrive-local a la place)
+    echo Connect your cloud account to rclone: choose "n" (new remote),
+    echo name it "onedrive" (or gdrive, dropbox...) then sign in in the browser.
+    echo (AADSTS700016 error on a work/school account? -> pick 1) onedrive-local instead)
     "vendor\windows-amd64\rclone.exe" config
 )
 
-:: --- cree/met a jour la config de l'app ---
+:: --- create/update the app config ---
 %PY% -c "from savesync import core; cfg=core.load_config(); cfg['remote']='%REMOTE%'; core.save_config(cfg); print('remote:', cfg['remote'], '->', core.config_path())"
 
 echo.
-echo Scan automatique des dossiers de sauvegardes...
+echo Scanning save folders automatically...
 %PY% savesync.py --cli scan --auto
 
 echo.
-echo Premier sync vers le cloud...
+echo First sync to the cloud...
 %PY% savesync.py --cli sync
 
 echo.
 echo ============================================================
-echo   Termine ! Lancement de l'interface graphique...
-echo   (pense a cliquer sur "Auto-sync" dans l'app)
+echo   Done! Launching the GUI...
+echo   (remember to click "Auto-sync" in the app)
 echo ============================================================
 start "" powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0run.ps1"
