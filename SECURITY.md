@@ -19,5 +19,5 @@ Nothing is sent anywhere else; there is no telemetry, no account, no server of o
 
 ## Reporting a vulnerability
 
-Open a [private security advisory](https://github.com/benjamin-bock/cloud-save-sync/security/advisories/new)
+Open a [private security advisory](https://github.com/benjamin-bock/nuage/security/advisories/new)
 or an issue if the impact is low.

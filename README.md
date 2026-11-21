@@ -1,6 +1,8 @@
-# Cloud Save Sync
+# ☁️ Nuage — Cloud Save Sync
 
-[![build](https://github.com/benjamin-bock/cloud-save-sync/actions/workflows/build.yml/badge.svg)](https://github.com/benjamin-bock/cloud-save-sync/actions/workflows/build.yml)
+*Nuage = “cloud” in French.*
+
+[![build](https://github.com/benjamin-bock/nuage/actions/workflows/build.yml/badge.svg)](https://github.com/benjamin-bock/nuage/actions/workflows/build.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
@@ -12,7 +14,7 @@ No account needed on our side: everything goes to *your own* cloud account. The 
 
 ## 🚀 Quick start for gamers (3 steps, no terminal)
 
-1. **Download** the latest `CloudSaveSync-windows-amd64.exe` from [Releases](https://github.com/benjamin-bock/cloud-save-sync/releases)
+1. **Download** the latest `CloudSaveSync-windows-amd64.exe` from [Releases](https://github.com/benjamin-bock/nuage/releases)
    (Linux/macOS: see [Install](#install)).
 2. **Double-click `setup.bat`** from the source folder (or the release zip): pick your cloud
    (`1) onedrive-local` recommended — no login prompt at all), it scans your games and syncs once.
@@ -35,13 +37,13 @@ flowchart LR
   or a **local cloud folder** (`onedrive-local`, `gdrive-local`, `dropbox-local`) — no OAuth at all,
   perfect for work/school accounts (see [AADSTS700016 error](#aadsts700016-error-on-onedrive-oauth)).
 - **GUI** (Tkinter, zero extra deps) + full **CLI** for headless/server use.
-- Packaged as a single standalone `.exe` / binary per OS (see [Releases](https://github.com/benjamin-bock/cloud-save-sync/releases)).
+- Packaged as a single standalone `.exe` / binary per OS (see [Releases](https://github.com/benjamin-bock/nuage/releases)).
 
 ## Install
 
 ### Windows (no terminal needed)
 
-1. Download the latest `CloudSaveSync-windows-amd64.exe` from [Releases](https://github.com/benjamin-bock/cloud-save-sync/releases)
+1. Download the latest `CloudSaveSync-windows-amd64.exe` from [Releases](https://github.com/benjamin-bock/nuage/releases)
    (or build it yourself, see [Build](#build)).
 2. Double-click **`setup.bat`** in the source folder once: it connects your cloud (choice `1) onedrive-local`
    recommended — no OAuth), auto-scans your save folders, runs the first sync, then opens the app.
@@ -54,7 +56,7 @@ Requirements: Python 3.10+ with Tkinter.
 - Linux: `sudo apt install python3 python3-tk` (or your distro's equivalent).
 
 ```bash
-git clone https://github.com/benjamin-bock/cloud-save-sync.git
+git clone https://github.com/benjamin-bock/nuage.git
 cd cloud-save-sync
 python scripts/fetch_rclone.py      # download the rclone binary for your platform (vendor/)
 python savesync.py                  # launch the GUI
