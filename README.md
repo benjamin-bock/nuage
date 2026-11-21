@@ -141,6 +141,15 @@ si distribution hors cercle de confiance.
 
 ## Notes & dépannage
 
+- **Erreur `AADSTS700016` lors du `rclone config` OneDrive** (compte pro/école, ex. université) :
+  le tenant bloque l'application rclone par défaut. **Solution recommandée : choisis
+  `onedrive-local` comme provider** (dans ⚙ Paramètres ou au choix 1 de `setup.bat`) →
+  l'app sync tes saves dans le dossier OneDrive déjà synchronisé localement
+  (`%USERPROFILE%\OneDrive\SaveSync\...`), et le client OneDrive officiel fait l'upload.
+  Aucun OAuth. Idem avec `gdrive-local` / `dropbox-local`.
+- Alternative : créer ta propre app Azure AD (client_id/client_secret) et la renseigner
+  dans `rclone config`, ou utiliser Google Drive/Dropbox via rclone.
+
 - Config : `%APPDATA%\savesync\config.json` (Windows), `~/.config/savesync/config.json`
   (Linux), `~/Library/Application Support/savesync/config.json` (macOS).
 - Ne lance pas de sync simultanés sur deux machines (bisync pose un lock 2 min côté cloud).

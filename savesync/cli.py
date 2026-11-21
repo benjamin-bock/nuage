@@ -18,8 +18,9 @@ def _prompt(text: str, default: str) -> str:
 def cmd_init(args) -> int:
     cfg = core.load_config()
     print("=== Configuration de Cloud Save Sync ===")
-    print("Providers cloud via rclone : onedrive, gdrive (Google Drive), dropbox, mega...")
-    print("Ou 'icloud' (iCloud Drive) ou 'local:<chemin>' (dossier local).")
+    print("Providers : 'onedrive-local' (RECOMMANDE : dossier OneDrive local, sans OAuth,")
+    print("  ideal compte pro/ecole), 'gdrive-local', 'dropbox-local', 'icloud',")
+    print("  'local:<chemin>', ou un remote rclone : onedrive, gdrive, dropbox, mega...")
     cfg["remote"] = _prompt("Nom du provider / remote rclone", cfg["remote"])
     cfg["remote_dir"] = _prompt("Dossier racine dans le cloud", cfg["remote_dir"])
     cfg["engine"] = _prompt("Moteur : bisync (sync) ou copy (backup)", cfg["engine"])

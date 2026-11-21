@@ -153,8 +153,34 @@ def _icloud_drive() -> Path:
     )
 
 
+# Backends "dossier local déjà synchronisé par le client cloud" (OneDrive, Google Drive,
+# Dropbox) : zero OAuth, ideal pour les comptes pro/ecole bloques par AADSTS700016.
+LOCAL_SYNC_REMOTES = {
+    "onedrive-local": ["OneDrive"],   # prefere le OneDrive perso, sinon le 1er OneDrive*
+    "gdrive-local": ["Google Drive", "GoogleDrive"],
+    "dropbox-local": ["Dropbox"],
+}
+
+
+def _local_sync_base(remote: str) -> Path:
+    home = Path.home()
+    for name in LOCAL_SYNC_REMOTES.get(remote, []):
+        p = home / name
+        if p.is_dir():
+            return p
+    if remote == "onedrive-local":
+        matches = sorted(home.glob("OneDrive*"), key=lambda p: (len(p.name), p.name))
+        if matches:
+            return matches[0]
+    raise RcloneError(
+        f"Dossier local du client {remote} introuvable sous {home}. "
+        "Installe/synchronise le client cloud (OneDrive, Google Drive for desktop, Dropbox)."
+    )
+
+
 def is_local_backend(cfg: dict) -> bool:
-    return cfg["remote"] == "icloud" or str(cfg["remote"]).startswith("local:")
+    remote = str(cfg["remote"])
+    return remote == "icloud" or remote.startswith("local:") or remote in LOCAL_SYNC_REMOTES
 
 
 def remote_spec(cfg: dict, key: str) -> str:
@@ -162,6 +188,8 @@ def remote_spec(cfg: dict, key: str) -> str:
     remote = str(cfg["remote"])
     if remote == "icloud":
         return str(_icloud_drive() / cfg["remote_dir"] / key)
+    if remote in LOCAL_SYNC_REMOTES:
+        return str(_local_sync_base(remote) / cfg["remote_dir"] / key)
     if remote.startswith("local:"):
         return str(Path(remote[6:]) / cfg["remote_dir"] / key)
     return f"{remote}:{cfg['remote_dir']}/{key}"

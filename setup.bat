@@ -24,15 +24,30 @@ if not exist "vendor\windows-amd64\rclone.exe" (
     %PY% scripts\fetch_rclone.py || (echo ERREUR fetch_rclone; pause; exit /b 1)
 )
 
-:: --- connexion du compte cloud a rclone (une seule fois, navigateur) ---
+:: --- choix du provider ---
 echo.
-echo Connexion du compte cloud a rclone : choisis "n" (new remote),
-echo nomme-le "onedrive" (ou gdrive, dropbox...) puis connecte-toi dans le navigateur.
-echo (Si c'est deja fait, ferme simplement cette fenetre : Ctrl+C puis "n"... ou reponds et reconfigure.)
-"vendor\windows-amd64\rclone.exe" config
+echo Choisis ton cloud :
+echo   1) onedrive-local  = dossier OneDrive DEJA synchronise en local (RECOMMANDE,
+echo                        aucun OAuth, marche aussi avec un compte pro/ecole)
+echo   2) gdrive-local    = dossier Google Drive local (Google Drive for desktop)
+echo   3) dropbox-local   = dossier Dropbox local
+echo   4) autre remote rclone (onedrive OAuth, gdrive, dropbox...) - necessite rclone config
+set /p CHOIX="Ton choix [1]: "
+if "%CHOIX%"=="" set CHOIX=1
+if "%CHOIX%"=="1" set "REMOTE=onedrive-local"
+if "%CHOIX%"=="2" set "REMOTE=gdrive-local"
+if "%CHOIX%"=="3" set "REMOTE=dropbox-local"
+if "%CHOIX%"=="4" (
+    set "REMOTE=onedrive"
+    echo.
+    echo Connexion du compte cloud a rclone : choisis "n" (new remote),
+    echo nomme-le "onedrive" (ou gdrive, dropbox...) puis connecte-toi dans le navigateur.
+    echo (erreur AADSTS700016 sur un compte pro/ecole ? -> choisis 1) onedrive-local a la place)
+    "vendor\windows-amd64\rclone.exe" config
+)
 
-:: --- cree la config de l'app si absente (remote par defaut : onedrive) ---
-%PY% -c "from savesync import core, os; p=core.config_path(); os.path.exists(str(p)) or core.save_config(core.load_config()); print('config:', p)"
+:: --- cree/met a jour la config de l'app ---
+%PY% -c "from savesync import core; cfg=core.load_config(); cfg['remote']='%REMOTE%'; core.save_config(cfg); print('remote:', cfg['remote'], '->', core.config_path())"
 
 echo.
 echo Scan automatique des dossiers de sauvegardes...

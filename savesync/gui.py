@@ -21,7 +21,7 @@ class SettingsDialog(tk.Toplevel):
 
         rows = [
             ("Provider / remote rclone", "remote",
-             "onedrive, gdrive, dropbox... ou 'icloud' ou 'local:<chemin>'"),
+             "onedrive-local (recommandé, sans OAuth), onedrive, gdrive, dropbox, icloud, local:<chemin>"),
             ("Dossier racine cloud", "remote_dir", ""),
             ("Moteur", "engine", "bisync (sync) ou copy (backup)"),
             ("Conflits", "conflict_resolve", "newer / older / larger / smaller"),
