@@ -58,8 +58,18 @@ echo First sync to the cloud...
 %PY% savesync.py --cli sync
 
 echo.
+set /p STARTUP="Launch Cloud Save Sync automatically at Windows startup? [Y/n]: "
+if /i not "%STARTUP%"=="n" %PY% -c "from savesync import core; core.set_autostart(True)"
+
+echo.
 echo ============================================================
-echo   Done! Launching the GUI...
-echo   (remember to click "Auto-sync" in the app)
+echo   Done! Launching the GUI (no console window)...
+echo   (the app syncs once on startup; click "Auto-sync" to keep syncing)
 echo ============================================================
-start "" powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0run.ps1"
+:: windowless interpreter (pythonw) so the GUI opens without a terminal window
+set "PYW="
+if exist "%PY:python.exe=pythonw.exe%" set "PYW=%PY:python.exe=pythonw.exe%"
+if "%PYW%"=="" where pythonw >nul 2>nul && set "PYW=pythonw"
+if "%PYW%"=="" where pyw >nul 2>nul && set "PYW=pyw"
+if "%PYW%"=="" set "PYW=%PY%"
+start "" "%PYW%" "%~dp0savesync.py"

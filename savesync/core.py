@@ -10,6 +10,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -36,6 +37,8 @@ DEFAULTS = {
     "compare": "size,modtime",     # rclone compare fields
     "interval_sec": 300,           # periodic sync in watch mode
     "watch_debounce_sec": 3,       # watch debounce delay
+    "sync_on_start": True,         # one sync when the GUI opens (pulls cloud -> this PC)
+    "autostart": False,            # launch the app at login (see set_autostart)
     "folders": [],                 # [{key, path, resynced}]
 }
 
@@ -651,3 +654,144 @@ class Watcher(threading.Thread):
                 last_full = now
             self._stop_event.wait(1.0)
         self.log("Watch stopped.")
+
+
+# ------------------------------------------------------------- autostart ----
+
+def _app_entrypoint() -> str:
+    """Path of savesync.py when running from source."""
+    return str(Path(__file__).resolve().parent.parent / "savesync.py")
+
+
+def _windowless_python() -> str:
+    """pythonw.exe (no console window) next to the running interpreter, else pyw/pythonw in PATH."""
+    if system() == "Windows":
+        cand = Path(sys.executable).with_name("pythonw.exe")
+        if cand.is_file():
+            return str(cand)
+        w = shutil.which("pyw") or shutil.which("pythonw")
+        if w:
+            return w
+    return sys.executable
+
+
+def autostart_command() -> list[str]:
+    """Command for OS autostart: the packaged exe if frozen, else windowless python + savesync.py.
+    No args -> the GUI opens (it syncs once on startup, see sync_on_start)."""
+    if getattr(sys, "frozen", False):
+        return [sys.executable]
+    return [_windowless_python(), _app_entrypoint()]
+
+
+def _startup_lnk() -> Path:
+    base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+    return base / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "CloudSaveSync.lnk"
+
+
+def _autostart_desktop() -> Path:
+    base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return base / "autostart" / "CloudSaveSync.desktop"
+
+
+def _ps_quote(s: str) -> str:
+    return "'" + s.replace("'", "''") + "'"
+
+
+def is_autostart_enabled() -> bool:
+    s = system()
+    if s == "Windows":
+        return _startup_lnk().exists()
+    if s == "Darwin":
+        try:
+            proc = subprocess.run(
+                ["osascript", "-e",
+                 'tell application "System Events" to get the name of every login item'],
+                capture_output=True, text=True, timeout=15,
+            )
+            return "CloudSaveSync" in (proc.stdout or "")
+        except Exception:
+            return False
+    return _autostart_desktop().exists()
+
+
+def _set_autostart_windows(enabled: bool, log) -> bool:
+    lnk = _startup_lnk()
+    if not enabled:
+        if lnk.exists():
+            lnk.unlink()
+            log("Removed from Windows startup (Startup folder).")
+        else:
+            log("Was not in Windows startup.")
+        return True
+    cmd = autostart_command()
+    target, args = cmd[0], " ".join(cmd[1:])
+    workdir = (str(Path(sys.executable).parent) if getattr(sys, "frozen", False)
+               else str(Path(_app_entrypoint()).parent))
+    lnk.parent.mkdir(parents=True, exist_ok=True)
+    ps = (
+        "$ws = New-Object -ComObject WScript.Shell; "
+        f"$s = $ws.CreateShortcut({_ps_quote(str(lnk))}); "
+        f"$s.TargetPath = {_ps_quote(target)}; "
+        f"$s.Arguments = {_ps_quote(args)}; "
+        f"$s.WorkingDirectory = {_ps_quote(workdir)}; "
+        "$s.Save()"
+    )
+    proc = subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+        capture_output=True, text=True,
+    )
+    if proc.returncode == 0 and lnk.exists():
+        log(f"Added to Windows startup: {lnk}")
+        return True
+    log(f"Could not create the startup shortcut: {(proc.stderr or proc.stdout).strip()}")
+    return False
+
+
+def _set_autostart_linux(enabled: bool, log) -> bool:
+    f = _autostart_desktop()
+    if not enabled:
+        if f.exists():
+            f.unlink()
+            log("Removed from Linux autostart (~/.config/autostart).")
+        else:
+            log("Was not in Linux autostart.")
+        return True
+    f.parent.mkdir(parents=True, exist_ok=True)
+    exec_line = " ".join(shlex.quote(c) for c in autostart_command())
+    f.write_text(
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        "Name=Cloud Save Sync\n"
+        f"Exec={exec_line}\n"
+        "Terminal=false\n",
+        encoding="utf-8",
+    )
+    log(f"Added to Linux autostart: {f}")
+    return True
+
+
+def _set_autostart_darwin(enabled: bool, log) -> bool:
+    path = sys.executable if getattr(sys, "frozen", False) else _app_entrypoint()
+    if enabled:
+        script = ('tell application "System Events" to make login item at end '
+                  f'with properties {{path:"{path}", hidden:false}}')
+    else:
+        script = 'tell application "System Events" to delete login item "CloudSaveSync"'
+    proc = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    if proc.returncode == 0:
+        log("Added to macOS Login Items." if enabled else "Removed from macOS Login Items.")
+        return True
+    log(f"Login Items error: {(proc.stderr or proc.stdout).strip()} "
+        "(alternative: System Settings -> General -> Login Items)")
+    return False
+
+
+def set_autostart(enabled: bool, log=print) -> bool:
+    """Register/unregister the app in the OS autostart (launch at login).
+    Windows: Startup folder shortcut. Linux: ~/.config/autostart .desktop. macOS: Login Items."""
+    s = system()
+    if s == "Windows":
+        return _set_autostart_windows(enabled, log)
+    if s == "Darwin":
+        return _set_autostart_darwin(enabled, log)
+    return _set_autostart_linux(enabled, log)

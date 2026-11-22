@@ -38,8 +38,24 @@ class SettingsDialog(tk.Toplevel):
                 ttk.Label(self, text=hint, foreground="gray").grid(row=i, column=2, sticky="w", padx=4)
             self.vars[key] = v
 
+        bools = [
+            ("Sync on startup (pull cloud -> this PC)", "sync_on_start",
+             "one sync when the app opens"),
+            ("Launch at startup", "autostart",
+             "Windows: Startup folder / Linux: autostart / macOS: Login Items"),
+        ]
+        self.bvars = {}
+        for j, (label, key, hint) in enumerate(bools):
+            i = len(rows) + j
+            v = tk.BooleanVar(value=bool(self.cfg.get(key, core.DEFAULTS.get(key, False))))
+            ttk.Checkbutton(self, text=label, variable=v).grid(
+                row=i, column=0, columnspan=2, sticky="w", padx=8, pady=4)
+            if hint:
+                ttk.Label(self, text=hint, foreground="gray").grid(row=i, column=2, sticky="w", padx=4)
+            self.bvars[key] = v
+
         ttk.Button(self, text="Save", command=self._save).grid(
-            row=len(rows), column=0, columnspan=3, pady=10)
+            row=len(rows) + len(bools), column=0, columnspan=3, pady=10)
 
     def _save(self):
         for key, v in self.vars.items():
@@ -47,6 +63,8 @@ class SettingsDialog(tk.Toplevel):
             if key in ("interval_sec", "watch_debounce_sec"):
                 val = int(val) if val else core.DEFAULTS[key]
             self.cfg[key] = val
+        for key, v in self.bvars.items():
+            self.cfg[key] = bool(v.get())
         self.on_save(self.cfg)
         self.destroy()
 
@@ -96,6 +114,8 @@ class App(tk.Tk):
         self._set_status()
         self.after(200, self._drain_queue)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        if self.cfg.get("sync_on_start", True):
+            self.after(600, self.do_sync)
 
     # ------------------------------------------------------------- UI ----
     def _build_ui(self):
@@ -204,6 +224,10 @@ class App(tk.Tk):
     def _on_settings_saved(self, new_cfg):
         core.save_config(new_cfg)
         self.cfg = core.load_config()
+        try:
+            core.set_autostart(bool(self.cfg.get("autostart", False)), log=self.log)
+        except Exception as e:
+            self.log(f"Autostart error: {e}", "error")
         self._set_status()
         self.log("Settings saved.")
 
