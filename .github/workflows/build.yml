@@ -78,7 +78,10 @@ jobs:
             --jq ".[] | select(.tag_name==\"$tag\") | .id" \
             | while read -r id; do gh api -X DELETE "repos/{owner}/{repo}/releases/$id" || true; done
           gh release create "$tag" --title "Nuage $tag" --generate-notes $prerelease
-          shopt -s nullglob
-          files=(release-bin/CloudSaveSync-*/CloudSaveSync*)
-          echo "Upload de: ${files[*]}"
-          gh release upload "$tag" "${files[@]}" --clobber
+          # renomme pour eviter les collisions de noms (linux/macos = "CloudSaveSync")
+          mkdir -p dist-release
+          cp release-bin/CloudSaveSync-windows-amd64/CloudSaveSync.exe dist-release/CloudSaveSync-windows-amd64.exe
+          cp release-bin/CloudSaveSync-linux-amd64/CloudSaveSync     dist-release/CloudSaveSync-linux-amd64
+          cp release-bin/CloudSaveSync-macos-arm64/CloudSaveSync     dist-release/CloudSaveSync-macos-arm64
+          ls -la dist-release
+          gh release upload "$tag" dist-release/* --clobber
