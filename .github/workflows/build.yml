@@ -73,11 +73,11 @@ jobs:
           prerelease=""
           case "$tag" in v0.*) prerelease="--prerelease" ;; esac
           ls -R release-bin || true
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release edit "$tag" $prerelease
-          else
-            gh release create "$tag" --title "Nuage $tag" --generate-notes $prerelease
-          fi
+          # supprime une ancienne release pour ce tag (re-tag = tag deplace -> release "untagged")
+          gh api --paginate "repos/{owner}/{repo}/releases?per_page=100" \
+            --jq ".[] | select(.tag_name==\"$tag\") | .id" \
+            | while read -r id; do gh api -X DELETE "repos/{owner}/{repo}/releases/$id" || true; done
+          gh release create "$tag" --title "Nuage $tag" --generate-notes $prerelease
           shopt -s nullglob
           files=(release-bin/CloudSaveSync-*/CloudSaveSync*)
           echo "Upload de: ${files[*]}"
