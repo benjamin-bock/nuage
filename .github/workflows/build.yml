@@ -54,6 +54,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # requis pour --generate-notes (gh a besoin de l'historique git)
+
       - uses: actions/download-artifact@v4
         with:
           pattern: CloudSaveSync-*
