@@ -64,12 +64,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -x
           tag="${{ github.ref_name }}"
           prerelease=""
-          [[ "$tag" == v0.* ]] && prerelease="--prerelease"
-          # create si inexistant, sinon edit (idempotent)
-          gh release create "$tag" --title "Nuage $tag" --generate-notes $prerelease --target "${{ github.sha }}" \
-            || gh release edit "$tag" $prerelease --latest
+          case "$tag" in v0.*) prerelease="--prerelease" ;; esac
+          ls -R release-bin || true
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" $prerelease
+          else
+            gh release create "$tag" --title "Nuage $tag" --generate-notes $prerelease
+          fi
           shopt -s nullglob
           files=(release-bin/CloudSaveSync-*/CloudSaveSync*)
           echo "Upload de: ${files[*]}"
