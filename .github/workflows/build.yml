@@ -60,17 +60,17 @@ jobs:
           path: release-bin
           merge-multiple: false
 
-      - name: create GitHub release (pre-release for v0.x)
-        uses: softprops/action-gh-release@v2
-        with:
-          prerelease: ${{ startsWith(github.ref_name, 'v0.') }}
-          generate_release_notes: true
-
-      - name: upload binaries to the release
+      - name: create release (pre-release for v0.x) + upload binaries
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          tag="${{ github.ref_name }}"
+          prerelease=""
+          [[ "$tag" == v0.* ]] && prerelease="--prerelease"
+          # create si inexistant, sinon edit (idempotent)
+          gh release create "$tag" --title "Nuage $tag" --generate-notes $prerelease --target "${{ github.sha }}" \
+            || gh release edit "$tag" $prerelease --latest
           shopt -s nullglob
           files=(release-bin/CloudSaveSync-*/CloudSaveSync*)
           echo "Upload de: ${files[*]}"
-          gh release upload "${{ github.ref_name }}" "${files[@]}" --clobber
+          gh release upload "$tag" "${files[@]}" --clobber
