@@ -8,6 +8,7 @@ import time
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from . import core
+from . import tray
 
 
 class SettingsDialog(tk.Toplevel):
@@ -43,6 +44,8 @@ class SettingsDialog(tk.Toplevel):
              "one sync when the app opens"),
             ("Launch at startup", "autostart",
              "Windows: Startup folder / Linux: autostart / macOS: Login Items"),
+            ("Minimize to tray on close (Windows)", "minimize_to_tray",
+             "taskbar ^ icon; Exit in its menu quits for real"),
         ]
         self.bvars = {}
         for j, (label, key, hint) in enumerate(bools):
@@ -108,12 +111,15 @@ class App(tk.Tk):
         self.msgq: queue.Queue = queue.Queue()
         self.watcher: core.Watcher | None = None
         self.worker: threading.Thread | None = None
+        self.tray = None
 
         self._build_ui()
         self.refresh_tree()
         self._set_status()
         self.after(200, self._drain_queue)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        if tray.available() and self.cfg.get("minimize_to_tray", True):
+            self._init_tray()
         if self.cfg.get("sync_on_start", True):
             self.after(600, self.do_sync)
 
@@ -228,6 +234,13 @@ class App(tk.Tk):
             core.set_autostart(bool(self.cfg.get("autostart", False)), log=self.log)
         except Exception as e:
             self.log(f"Autostart error: {e}", "error")
+        if tray.available():
+            if self.cfg.get("minimize_to_tray", True) and self.tray is None:
+                self._init_tray()
+            elif not self.cfg.get("minimize_to_tray", True) and self.tray is not None:
+                self.tray.remove()
+                self.tray = None
+                self.log("System tray icon removed (closing the window will quit).")
         self._set_status()
         self.log("Settings saved.")
 
@@ -305,10 +318,53 @@ class App(tk.Tk):
             self.log("Auto-sync stop requested...")
             self.watcher = None
 
-    def _on_close(self):
+    def _init_tray(self):
+        try:
+            self.tray = tray.TrayIcon(
+                tooltip="Cloud Save Sync",
+                on_show=self._restore_from_tray,
+                on_sync=self.do_sync,
+                on_toggle_auto=self._toggle_auto_from_tray,
+                on_exit=self._quit,
+                is_auto_on=lambda: bool(self.watcher and self.watcher.is_alive()),
+            )
+            self.tray.create()
+            self.tray.start_pump(self)
+            self.log("System tray icon active (closing the window minimizes to the tray).")
+        except Exception as e:
+            self.tray = None
+            self.log(f"Tray icon unavailable ({e}); closing the window will quit.", "warn")
+
+    def _restore_from_tray(self):
+        self.deiconify()
+        try:
+            self.lift()
+            self.focus_force()
+        except tk.TclError:
+            pass
+        self.log("Restored from the system tray.")
+
+    def _toggle_auto_from_tray(self):
+        if self.watcher and self.watcher.is_alive():
+            self.do_stop_watch()
+        else:
+            self.do_start_watch()
+
+    def _quit(self):
         if self.watcher:
             self.watcher.stop()
+        if self.tray:
+            self.tray.remove()
+            self.tray = None
         self.destroy()
+
+    def _on_close(self):
+        if self.tray is not None:
+            self.withdraw()
+            self.log("Minimized to the system tray (taskbar ^). "
+                     "Right-click the tray icon -> Exit to quit for real.")
+            return
+        self._quit()
 
 
 def main():
