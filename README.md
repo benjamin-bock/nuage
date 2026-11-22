@@ -39,6 +39,9 @@ flowchart LR
   or a **local cloud folder** (`onedrive-local`, `gdrive-local`, `dropbox-local`) — no OAuth at all,
   perfect for work/school accounts (see [AADSTS700016 error](#aadsts700016-error-on-onedrive-oauth)).
 - **GUI** (Tkinter, zero extra deps) + full **CLI** for headless/server use.
+- **Close to system tray** (Windows): closing the window minimizes the app to the taskbar's
+  background-apps area (^ icon) — right-click it for Show / Sync now / Auto-sync / Exit.
+  Auto-sync keeps running while minimized; *Exit* quits for real.
 - Packaged as a single standalone `.exe` / binary per OS (see [Releases](https://github.com/benjamin-bock/nuage/releases)).
 
 ## Install
@@ -92,6 +95,8 @@ Linux/macOS one-liner setup: `sh setup.sh`.
 
 On launch the app runs **one sync** (cloud → this PC) unless *Sync on startup* is disabled in Settings —
 so opening the app on a new device immediately downloads the latest saves.
+On Windows, closing the window **minimizes to the system tray** (taskbar ^) instead of quitting
+(disable with *Minimize to tray on close* in Settings); use the tray icon's **Exit** to quit.
 
 ### CLI
 
@@ -162,6 +167,7 @@ Config file (JSON):
 | `extra_roots` | extra folders to scan for saves |
 | `sync_on_start` | run one sync (cloud → PC) when the GUI opens (default `true`) |
 | `autostart` | launch the app at login (default `false`; set via Settings or `setup.bat`) |
+| `minimize_to_tray` | close button minimizes to the system tray instead of quitting, Windows only (default `true`) |
 
 ## Automation
 

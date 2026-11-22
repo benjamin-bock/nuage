@@ -17,7 +17,7 @@ Thanks for your interest in Cloud Save Sync!
 ## Ideas / good first issues
 
 - New save-location heuristics per platform (see `scan_roots()` in `savesync/core.py`)
-- A system-tray icon for the GUI
+- System-tray icon on Linux/macOS (Windows is done, see `savesync/tray.py`)
 - Better conflict UI (show `*.conflictN` diffs in the app)
 - Translations (i18n) of the GUI
 - Tests (pytest) for `core.py`

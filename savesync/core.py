@@ -39,6 +39,7 @@ DEFAULTS = {
     "watch_debounce_sec": 3,       # watch debounce delay
     "sync_on_start": True,         # one sync when the GUI opens (pulls cloud -> this PC)
     "autostart": False,            # launch the app at login (see set_autostart)
+    "minimize_to_tray": True,      # close button -> system tray (Windows) instead of quitting
     "folders": [],                 # [{key, path, resynced}]
 }
 
