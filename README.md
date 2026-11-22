@@ -17,8 +17,10 @@ No account needed on our side: everything goes to *your own* cloud account. The 
 1. **Download** the latest `CloudSaveSync-windows-amd64.exe` from [Releases](https://github.com/benjamin-bock/nuage/releases)
    (Linux/macOS: see [Install](#install)).
 2. **Double-click `setup.bat`** from the source folder (or the release zip): pick your cloud
-   (`1) onedrive-local` recommended — no login prompt at all), it scans your games and syncs once.
+   (`1) onedrive-local` recommended — no login prompt at all), it scans your games, syncs once,
+   and offers to **launch the app automatically at Windows startup**.
 3. In the app: click **▶ Auto-sync**. Play on any PC — your saves follow you.
+   (The app also runs one sync every time it opens, so a new PC pulls the latest saves immediately.)
 
 ```mermaid
 flowchart LR
@@ -46,8 +48,10 @@ flowchart LR
 1. Download the latest `CloudSaveSync-windows-amd64.exe` from [Releases](https://github.com/benjamin-bock/nuage/releases)
    (or build it yourself, see [Build](#build)).
 2. Double-click **`setup.bat`** in the source folder once: it connects your cloud (choice `1) onedrive-local`
-   recommended — no OAuth), auto-scans your save folders, runs the first sync, then opens the app.
+   recommended — no OAuth), auto-scans your save folders, runs the first sync, asks whether to
+   **launch at Windows startup**, then opens the app (windowless — no console window).
 3. In the app: check the folders, click **🔄 Sync now**, then **▶ Auto-sync**.
+   You can also tick **Launch at startup** in **⚙ Settings** at any time.
 
 ### From source (Windows / Linux / macOS)
 
@@ -84,7 +88,10 @@ Linux/macOS one-liner setup: `sh setup.sh`.
 | 👁 Status | dry-run: what would change |
 | 🧹 Clean | drop false positives / deleted paths from the watch list |
 | ▶ Auto-sync / ⏹ Stop | sync on every file change + periodic sync |
-| ⚙ Settings | cloud provider, root folder, engine, conflict policy, intervals |
+| ⚙ Settings | cloud provider, root folder, engine, conflict policy, intervals, sync on startup, launch at startup |
+
+On launch the app runs **one sync** (cloud → this PC) unless *Sync on startup* is disabled in Settings —
+so opening the app on a new device immediately downloads the latest saves.
 
 ### CLI
 
@@ -105,8 +112,10 @@ python savesync.py --cli watch                # continuous auto-sync
 ### On the other device
 
 Same app + same cloud account, then `scan --auto` (or ➕ Add) and `sync`:
-saves arrive automatically (new-PC detection). On Windows you can also install the
-scheduled task (below) on both machines.
+saves arrive automatically (new-PC detection). The sync is **bidirectional** — every sync
+(manual, auto-sync, or on app launch) also pulls cloud changes down to the local folder,
+so device B gets device A's new saves as soon as the app opens or syncs.
+On Windows you can also install the scheduled task (below) on both machines.
 
 ## Where saves are looked for
 
@@ -151,13 +160,19 @@ Config file (JSON):
 | `engine` | `bisync` (true sync) or `copy` (backup, never deletes) |
 | `conflict_resolve` | `newer` / `older` / `larger` / `smaller` |
 | `extra_roots` | extra folders to scan for saves |
+| `sync_on_start` | run one sync (cloud → PC) when the GUI opens (default `true`) |
+| `autostart` | launch the app at login (default `false`; set via Settings or `setup.bat`) |
 
 ## Automation
 
-- **Windows**: `powershell -File packaging\Install-Task.ps1` → scheduled task syncing every 15 min + at logon.
+- **Launch at startup** (all OS): tick **Launch at startup** in **⚙ Settings**, or answer `Y` to the
+  prompt at the end of `setup.bat`. Windows: shortcut in the Startup folder ·
+  Linux: `~/.config/autostart/CloudSaveSync.desktop` · macOS: Login Items.
+  The GUI opens without a console window and syncs once on start.
+- **Windows background sync**: `powershell -File packaging\Install-Task.ps1` → scheduled task syncing every 15 min + at logon.
 - **Linux**: `packaging/cloud-save-sync.service` (systemd user unit — see the comments in the file) or
-  `packaging/CloudSaveSync.desktop` for autostart (launches the GUI with auto-sync).
-- **macOS**: add the app to Login Items (System Settings → General → Login Items).
+  `packaging/CloudSaveSync.desktop` for autostart.
+- **macOS**: Login Items (System Settings → General → Login Items), or tick *Launch at startup* in Settings.
 
 ## Build (standalone binary)
 

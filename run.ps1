@@ -29,5 +29,17 @@ if (-not $python) {
     Write-Error "Python 3.10+ not found. Install it from https://www.python.org/downloads/ (or winget install Python.Python.3.12), then retry."
     exit 1
 }
+if ($args2.Count -eq 0) {
+    # GUI: windowless interpreter (pythonw/pyw) so no console window appears
+    $pyw = $null
+    $cand = Join-Path (Split-Path -Parent $python) 'pythonw.exe'
+    if (Test-Path $cand) { $pyw = $cand }
+    elseif ($c = Get-Command pyw -ErrorAction SilentlyContinue) { $pyw = $c.Source }
+    elseif ($c = Get-Command pythonw -ErrorAction SilentlyContinue) { $pyw = $c.Source }
+    if ($pyw) {
+        & $pyw (Join-Path $Root 'savesync.py')
+        exit $LASTEXITCODE
+    }
+}
 Write-Host "Python: $python ($(& $python --version 2>&1 | Select-Object -First 1))"
 & $python (Join-Path $Root 'savesync.py') @args2
